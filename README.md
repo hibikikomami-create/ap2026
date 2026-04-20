@@ -1,73 +1,197 @@
-# React + TypeScript + Vite
+# MySheet — クリエイターのための収益管理ツール
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+個人事業主・小規模ブランドが、対話型ステップ入力で事業情報を整理し、商品ごとの収益シミュレーション・管理シート・発注書をかんたんに作れるWebアプリです。
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## セットアップ方法
 
-## React Compiler
+```bash
+# 1. 依存関係インストール
+npm install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# 2. 開発サーバー起動
+npm run dev
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 3. ブラウザで確認
+open http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 起動コマンド一覧
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| コマンド | 説明 |
+|---|---|
+| `npm run dev` | 開発サーバー起動（HMR対応） |
+| `npm run build` | 本番ビルド |
+| `npm run preview` | ビルド結果をプレビュー |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 確認URL
+
+| 環境 | URL |
+|---|---|
+| ローカル | http://localhost:5173 |
+
+---
+
+## 使用技術
+
+| 分類 | 技術 |
+|---|---|
+| フレームワーク | React 19 + TypeScript |
+| ビルド | Vite 8 |
+| スタイリング | Tailwind CSS v3 |
+| 状態管理 | Zustand（localStorage永続化） |
+| ルーティング | React Router v7 |
+| PDF出力 | jsPDF |
+| Excel出力 | SheetJS (xlsx) |
+
+---
+
+## 画面一覧
+
+| # | 画面名 | パス | 説明 |
+|---|---|---|---|
+| 1 | ランディング | `/` | ウェルカム画面・ブランドCTA |
+| 2 | ホーム | `/home` | サマリーカード・クイックアクション・最近のデータ |
+| 3 | オンボーディング ①〜⑤ | `/onboarding/1〜5` | ステップ式入力（ビジネス種別→チャネル→立場→費用→数値） |
+| 4 | 試算結果 | `/onboarding/result` | 売上・粗利・損益分岐点の表示 |
+| 5 | シート生成完了 | `/sheet-result` | 専用シート作成完了・次のアクション案内 |
+| 6 | 商品一覧 | `/dashboard` | カード／テーブル切替・検索・フィルター・一括操作 |
+| 7 | 商品作成 | `/products/new` | 新規商品追加（カテゴリ・カラー・サイズ対応） |
+| 8 | 商品編集 | `/products/:id` | 既存商品の編集・リアルタイム収益プレビュー |
+| 9 | 発注書作成 | `/documents/new` | 明細入力・PDF出力・Excel出力 |
+| 10 | 設定 | `/settings` | ユーザー情報・会社情報・出力設定 |
+
+---
+
+## 画面ごとに確認できること
+
+### ホーム (`/home`)
+- 月間粗利見込み・商品数・平均粗利率・プロジェクト数のサマリー
+- クイックアクション（商品追加、試算、発注書作成、一覧）
+- 試算サンプルの表示
+- 最近の商品・発注書リスト
+
+### オンボーディング (`/onboarding/1〜5`)
+- 6ステップのウィザード入力（戻る/次へ操作）
+- ビジネス種別・販売チャネル・立場・費用項目の選択
+- 商品数値入力（選択費用項目に応じて動的に表示）
+- 次へボタンのバリデーション
+
+### 試算結果 (`/onboarding/result`)
+- 月間売上・原価・粗利・利益率の表示
+- 損益分岐点の計算結果
+- 注意ポイントの警告表示
+- 「この内容で専用シートを作成する」→ シート生成完了画面へ
+
+### シート生成完了 (`/sheet-result`)
+- 生成完了アニメーション
+- 作成されたコンテンツ一覧
+- 商品一覧・発注書作成への導線
+
+### 商品一覧 (`/dashboard`)
+- スマホ：カード表示 / PC：テーブル表示（自動切替・手動切替ボタン）
+- 商品名・品番・価格・粗利・粗利率・ステータス表示
+- 検索・ステータスフィルター・並び替え
+- チェックボックスで複数選択
+- 選択後の一括操作バー（ステータス変更・削除・発注書作成）
+- 商品の複製・削除
+
+### 商品作成/編集 (`/products/new`, `/products/:id`)
+- 商品基本情報（名前・品番・カテゴリ）
+- カラー・サイズのタグ追加/削除
+- 上代・卸価格・原価・配送料・手数料率入力
+- リアルタイム粗利率・月間収益プレビューバー
+- ステータス・販売チャネル選択
+- 備考フィールド
+
+### 発注書作成 (`/documents/new`)
+- 発注先・発注者・日付入力
+- 明細行の追加・削除・数量/単価入力
+- 小計・消費税・合計の自動計算
+- PDF出力（jsPDF）・Excel出力（SheetJS）
+
+### 設定 (`/settings`)
+- ユーザー情報タブ（表示名・メール）
+- 会社情報タブ（屋号・住所・電話）
+- 出力設定タブ（税率・用紙サイズ・支払い条件・ロゴ表示フラグ）
+- リアルタイム保存フィードバック
+
+---
+
+## モック実装範囲
+
+- ✅ 全画面の表示・遷移
+- ✅ オンボーディングの条件分岐
+- ✅ 収益計算ロジック（リアルタイム）
+- ✅ 商品CRUD（Zustand + localStorage）
+- ✅ 複数選択・一括操作
+- ✅ PDF出力（jsPDF）
+- ✅ Excel出力（SheetJS）
+- ✅ ダミーデータ（商品6件・プロジェクト2件・発注書1件・試算サンプル）
+- ✅ 設定のlocal保存
+
+---
+
+## 未実装の範囲
+
+| 機能 | 理由 |
+|---|---|
+| バックエンドAPI / DB接続 | モック段階のため |
+| ユーザー認証・ログイン | 本実装フェーズで対応 |
+| 画像アップロード（商品・ロゴ） | ストレージ設計が必要 |
+| KPI・実績入力・実績vs計画比較 | Phase 2 機能 |
+| 帳票への日本語フォント（PDF） | jsPDF日本語フォント埋め込み |
+| 複数プロジェクト切替UI | 本実装で対応 |
+| 発注書履歴一覧画面 | 本実装で対応 |
+| パスワード変更・2段階認証 | 認証基盤が必要 |
+| ロゴ画像の帳票埋め込み | 本実装で対応 |
+| データエクスポート（全量） | 本実装で対応 |
+
+---
+
+## 次に本実装すべき優先順位
+
+1. **認証基盤**（Supabase Auth / Clerk など）
+2. **データベース接続**（Supabase / PlanetScale など）
+3. **画像ストレージ**（商品画像・ロゴ）
+4. **APIレイヤー**（tRPC または REST）
+5. **発注書履歴画面**（一覧・再出力）
+6. **PDFの日本語フォント対応**（jsPDF + Noto Sans JP）
+7. **複数プロジェクト切替UI**
+8. **Phase 2: KPI管理・実績入力・利益分析**
+
+---
+
+## ディレクトリ構成
+
 ```
+src/
+├── types/           # TypeScript型定義（全データモデル）
+├── store/           # Zustand ストア（localStorage永続化）
+├── lib/
+│   ├── calculations/ # 収益計算ロジック（UI層から分離）
+│   ├── exporters/    # PDF・Excel出力
+│   ├── sampleData.ts # 初期ダミーデータ
+│   └── nanoid.ts
+├── components/
+│   ├── common/      # 再利用UIコンポーネント
+│   └── layout/      # AppShell・SideNav・BottomNav
+└── pages/
+    ├── Welcome/     # ランディング
+    ├── Home/        # ホームダッシュボード
+    ├── Onboarding/  # Step1〜5 + Result
+    ├── SheetResult/ # シート生成完了
+    ├── Dashboard/   # 商品一覧
+    ├── ProductDetail/ # 商品作成・編集
+    ├── Documents/   # 発注書作成
+    └── Settings/    # 設定
+```
+
+---
+
+## 既知の不具合・制限事項
+
+- PDF出力の日本語文字はlatin1フォールバック（文字化けの可能性あり）→ 本実装でNoto Sansフォント埋め込みが必要
+- localStorage容量制限（5MB程度）により、大量データは保存不可
+- チャンクサイズが大きい（jsPDF + xlsxが主因）→ lazy importで改善可能

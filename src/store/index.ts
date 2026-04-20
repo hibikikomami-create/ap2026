@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nanoid } from '../lib/nanoid'
+import {
+  SAMPLE_PRODUCTS,
+  SAMPLE_PROJECTS,
+  SAMPLE_DOCUMENTS,
+  SAMPLE_SETTINGS,
+} from '../lib/sampleData'
 import type {
   AppState,
   OnboardingData,
@@ -8,6 +14,7 @@ import type {
   Project,
   Document,
   ProductStatus,
+  UserSettings,
 } from '../types'
 
 const defaultOnboarding: OnboardingData = {
@@ -28,6 +35,8 @@ const defaultOnboarding: OnboardingData = {
 }
 
 interface Actions {
+  // Seed
+  seedSampleData: () => void
   // Onboarding
   setOnboardingStep: (step: number) => void
   updateOnboarding: (data: Partial<OnboardingData>) => void
@@ -50,6 +59,8 @@ interface Actions {
   // Documents
   addDocument: (doc: Omit<Document, 'id' | 'createdAt'>) => Document
   deleteDocument: (id: string) => void
+  // Settings
+  updateSettings: (patch: Partial<UserSettings>) => void
 }
 
 type Store = AppState & Actions
@@ -57,44 +68,52 @@ type Store = AppState & Actions
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
-      // State
-      currentProject: null,
+      // ── State ─────────────────────────────────────────────────────────────
+      currentProject: SAMPLE_PROJECTS[0],
       onboarding: defaultOnboarding,
-      products: [],
-      documents: [],
+      products: SAMPLE_PRODUCTS,
+      projects: SAMPLE_PROJECTS,
+      documents: SAMPLE_DOCUMENTS,
       selectedProductIds: [],
       onboardingStep: 0,
+      settings: SAMPLE_SETTINGS,
+      isSeeded: true,
 
-      // Onboarding
+      // ── Seed ──────────────────────────────────────────────────────────────
+      seedSampleData: () => {
+        if (get().isSeeded) return
+        set({
+          products: SAMPLE_PRODUCTS,
+          projects: SAMPLE_PROJECTS,
+          documents: SAMPLE_DOCUMENTS,
+          currentProject: SAMPLE_PROJECTS[0],
+          isSeeded: true,
+        })
+      },
+
+      // ── Onboarding ────────────────────────────────────────────────────────
       setOnboardingStep: (step) => set({ onboardingStep: step }),
       updateOnboarding: (data) =>
         set((s) => ({ onboarding: { ...s.onboarding, ...data } })),
       resetOnboarding: () =>
         set({ onboarding: defaultOnboarding, onboardingStep: 0 }),
 
-      // Project
+      // ── Project ───────────────────────────────────────────────────────────
       createProject: (data) => {
         const now = new Date().toISOString()
-        const project: Project = {
-          id: nanoid(),
-          createdAt: now,
-          updatedAt: now,
-          ...data,
-        }
-        set({ currentProject: project })
+        const project: Project = { id: nanoid(), createdAt: now, updatedAt: now, ...data }
+        set((s) => ({
+          currentProject: project,
+          projects: [...s.projects, project],
+        }))
         return project
       },
       setCurrentProject: (project) => set({ currentProject: project }),
 
-      // Products
+      // ── Products ──────────────────────────────────────────────────────────
       addProduct: (data) => {
         const now = new Date().toISOString()
-        const product: Product = {
-          id: nanoid(),
-          createdAt: now,
-          updatedAt: now,
-          ...data,
-        }
+        const product: Product = { id: nanoid(), createdAt: now, updatedAt: now, ...data }
         set((s) => ({ products: [...s.products, product] }))
         return product
       },
@@ -141,7 +160,7 @@ export const useStore = create<Store>()(
           selectedProductIds: s.selectedProductIds.filter((id) => !ids.includes(id)),
         })),
 
-      // Selection
+      // ── Selection ─────────────────────────────────────────────────────────
       toggleProductSelection: (id) =>
         set((s) => ({
           selectedProductIds: s.selectedProductIds.includes(id)
@@ -151,7 +170,7 @@ export const useStore = create<Store>()(
       selectAllProducts: (ids) => set({ selectedProductIds: ids }),
       clearSelection: () => set({ selectedProductIds: [] }),
 
-      // Documents
+      // ── Documents ─────────────────────────────────────────────────────────
       addDocument: (doc) => {
         const document: Document = {
           id: nanoid(),
@@ -163,21 +182,30 @@ export const useStore = create<Store>()(
       },
       deleteDocument: (id) =>
         set((s) => ({ documents: s.documents.filter((d) => d.id !== id) })),
+
+      // ── Settings ──────────────────────────────────────────────────────────
+      updateSettings: (patch) =>
+        set((s) => ({ settings: { ...s.settings, ...patch } })),
     }),
     {
       name: 'ap2026-store',
       partialize: (s) => ({
         currentProject: s.currentProject,
         products: s.products,
+        projects: s.projects,
         documents: s.documents,
+        settings: s.settings,
+        isSeeded: s.isSeeded,
       }),
     }
   )
 )
 
-// Selector helpers
 export const useCurrentProject = () => useStore((s) => s.currentProject)
 export const useProducts = () => useStore((s) => s.products)
+export const useProjects = () => useStore((s) => s.projects)
 export const useSelectedIds = () => useStore((s) => s.selectedProductIds)
 export const useOnboarding = () => useStore((s) => s.onboarding)
 export const useOnboardingStep = () => useStore((s) => s.onboardingStep)
+export const useSettings = () => useStore((s) => s.settings)
+export const useDocuments = () => useStore((s) => s.documents)

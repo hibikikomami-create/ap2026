@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
-import { SAMPLE_PROJECT, SAMPLE_PRODUCTS } from '../../lib/sampleData'
 import { ProductCard } from './ProductCard'
 import { ProductTable } from './ProductTable'
 import { BulkActionBar } from './BulkActionBar'
@@ -14,14 +13,18 @@ const defaultFilter: FilterConfig = { status: 'all', channel: 'all', search: '' 
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const isSample = searchParams.get('sample') === '1'
 
   const {
-    currentProject, products: storeProducts, selectedProductIds,
-    deleteProduct, duplicateProduct,
-    toggleProductSelection, selectAllProducts, clearSelection,
-    bulkUpdateStatus, bulkDelete,
+    products,
+    selectedProductIds,
+    deleteProduct,
+    duplicateProduct,
+    toggleProductSelection,
+    selectAllProducts,
+    clearSelection,
+    bulkUpdateStatus,
+    bulkDelete,
+    currentProject,
   } = useStore()
 
   const [viewMode, setViewMode] = useState<ViewMode>(
@@ -30,18 +33,6 @@ export default function Dashboard() {
   const [filter, setFilter] = useState<FilterConfig>(defaultFilter)
   const [sort, setSort] = useState<SortConfig>({ key: 'createdAt', order: 'desc' })
 
-
-  const project = isSample ? SAMPLE_PROJECT : currentProject
-  const rawProducts = isSample ? SAMPLE_PRODUCTS : storeProducts.filter(
-    (p) => currentProject ? p.projectId === currentProject.id : true
-  )
-
-  useEffect(() => {
-    if (!isSample && !currentProject) {
-      navigate('/')
-    }
-  }, [isSample, currentProject, navigate])
-
   useEffect(() => {
     const handler = () => setViewMode(window.innerWidth >= 768 ? 'table' : 'card')
     window.addEventListener('resize', handler)
@@ -49,7 +40,7 @@ export default function Dashboard() {
   }, [])
 
   const filteredProducts = useMemo(() => {
-    let list = [...rawProducts]
+    let list = [...products]
 
     if (filter.status !== 'all') {
       list = list.filter((p) => p.status === filter.status)
@@ -66,17 +57,14 @@ export default function Dashboard() {
 
     list.sort((a, b) => {
       const k = sort.key
-      const calc = (p: typeof a) => calcProduct(p)
       let av: any, bv: any
-
       if (k === 'grossProfit') {
-        av = calc(a).grossProfit; bv = calc(b).grossProfit
+        av = calcProduct(a).grossProfit; bv = calcProduct(b).grossProfit
       } else if (k === 'grossMargin') {
-        av = calc(a).grossMargin; bv = calc(b).grossMargin
+        av = calcProduct(a).grossMargin; bv = calcProduct(b).grossMargin
       } else {
         av = (a as any)[k] ?? ''; bv = (b as any)[k] ?? ''
       }
-
       if (typeof av === 'number' && typeof bv === 'number') {
         return sort.order === 'asc' ? av - bv : bv - av
       }
@@ -86,7 +74,7 @@ export default function Dashboard() {
     })
 
     return list
-  }, [rawProducts, filter, sort])
+  }, [products, filter, sort])
 
   const handleToggleAll = () => {
     if (selectedProductIds.length === filteredProducts.length) {
@@ -97,87 +85,65 @@ export default function Dashboard() {
   }
 
   const handleDelete = (id: string) => {
-    if (isSample) return
     if (confirm('この商品を削除しますか？')) deleteProduct(id)
   }
 
   const handleBulkDelete = () => {
-    if (isSample) return
     if (confirm(`${selectedProductIds.length}件の商品を削除しますか？`)) {
       bulkDelete(selectedProductIds)
       clearSelection()
     }
   }
 
-  const handleCreateDocument = () => {
-    navigate('/documents/new')
-  }
-
   return (
-    <div className="min-h-svh bg-gray-50 flex flex-col">
+    <div className="flex flex-col min-h-svh">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 active:scale-95 transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-              </button>
-              <div>
-                <h1 className="font-bold text-gray-900 text-base leading-tight">
-                  {project?.name || 'マイシート'}
-                  {isSample && <span className="ml-2 badge bg-yellow-100 text-yellow-700">サンプル</span>}
-                </h1>
-                <div className="text-xs text-gray-400">{rawProducts.length}件の商品</div>
-              </div>
+            <div>
+              <h1 className="font-bold text-gray-900 text-base">商品管理</h1>
+              <div className="text-xs text-gray-400">{products.length}件 · {currentProject?.name ?? 'すべて'}</div>
             </div>
             <div className="flex items-center gap-2">
               {/* View toggle */}
               <div className="hidden sm:flex items-center bg-gray-100 rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('card')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'card' ? 'bg-white shadow text-brand-600' : 'text-gray-400'}`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow text-brand-600' : 'text-gray-400'}`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                </button>
+                {(['card', 'table'] as ViewMode[]).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setViewMode(v)}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === v ? 'bg-white shadow text-brand-600' : 'text-gray-400'}`}
+                  >
+                    {v === 'card' ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
               </div>
-              {!isSample && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/products/new')}
-                  className="btn-primary py-2 px-4 text-sm flex items-center gap-1"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="hidden sm:inline">商品追加</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => navigate('/products/new')}
+                className="btn-primary py-2 px-4 text-sm flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="hidden sm:inline">商品追加</span>
+              </button>
             </div>
           </div>
 
-          {/* Filter bar */}
-          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
-            <div className="relative flex-1 min-w-[140px]">
-              <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          {/* Filters */}
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="relative flex-1 min-w-[130px]">
+              <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -218,27 +184,29 @@ export default function Dashboard() {
         {filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="text-5xl mb-4">📦</div>
-            <div className="text-gray-500 text-lg font-medium mb-2">商品がまだありません</div>
-            <div className="text-gray-400 text-sm mb-6">商品を追加して管理を始めましょう</div>
-            {!isSample && (
-              <button
-                type="button"
-                onClick={() => navigate('/products/new')}
-                className="btn-primary"
-              >
-                最初の商品を追加する
-              </button>
-            )}
+            <div className="text-gray-500 text-lg font-medium mb-2">商品がありません</div>
+            <div className="text-gray-400 text-sm mb-6">
+              {filter.search || filter.status !== 'all'
+                ? 'フィルターを変更してみてください'
+                : '商品を追加して管理を始めましょう'}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/products/new')}
+              className="btn-primary"
+            >
+              商品を追加する
+            </button>
           </div>
         ) : viewMode === 'table' ? (
           <div className="card overflow-hidden">
             <ProductTable
               products={filteredProducts}
-              selectedIds={isSample ? [] : selectedProductIds}
-              onToggle={isSample ? () => {} : toggleProductSelection}
-              onToggleAll={isSample ? () => {} : handleToggleAll}
+              selectedIds={selectedProductIds}
+              onToggle={toggleProductSelection}
+              onToggleAll={handleToggleAll}
               onEdit={(id) => navigate(`/products/${id}`)}
-              onDuplicate={isSample ? () => {} : duplicateProduct}
+              onDuplicate={duplicateProduct}
               onDelete={handleDelete}
             />
           </div>
@@ -248,10 +216,10 @@ export default function Dashboard() {
               <ProductCard
                 key={product.id}
                 product={product}
-                selected={!isSample && selectedProductIds.includes(product.id)}
-                onToggle={() => !isSample && toggleProductSelection(product.id)}
+                selected={selectedProductIds.includes(product.id)}
+                onToggle={() => toggleProductSelection(product.id)}
                 onEdit={() => navigate(`/products/${product.id}`)}
-                onDuplicate={() => !isSample && duplicateProduct(product.id)}
+                onDuplicate={() => duplicateProduct(product.id)}
                 onDelete={() => handleDelete(product.id)}
               />
             ))}
@@ -259,31 +227,26 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Mobile add button */}
-      {!isSample && (
-        <div className="sm:hidden fixed bottom-20 right-4 z-20">
-          <button
-            type="button"
-            onClick={() => navigate('/products/new')}
-            className="w-14 h-14 bg-brand-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {/* FAB for mobile */}
+      <div className="sm:hidden fixed bottom-20 right-4 z-20">
+        <button
+          type="button"
+          onClick={() => navigate('/products/new')}
+          className="w-14 h-14 bg-brand-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      </div>
 
-      {/* Bulk action bar */}
-      {!isSample && (
-        <BulkActionBar
-          count={selectedProductIds.length}
-          onClearSelection={clearSelection}
-          onBulkStatus={(s) => bulkUpdateStatus(selectedProductIds, s)}
-          onBulkDelete={handleBulkDelete}
-          onCreateDocument={handleCreateDocument}
-        />
-      )}
+      <BulkActionBar
+        count={selectedProductIds.length}
+        onClearSelection={clearSelection}
+        onBulkStatus={(s) => bulkUpdateStatus(selectedProductIds, s)}
+        onBulkDelete={handleBulkDelete}
+        onCreateDocument={() => navigate('/documents/new')}
+      />
     </div>
   )
 }

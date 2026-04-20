@@ -32,6 +32,16 @@ export type ProductStatus =
   | 'draft'
   | 'discontinued'
 
+export type ProductCategory =
+  | 'apparel'
+  | 'accessory'
+  | 'food'
+  | 'beauty'
+  | 'home'
+  | 'digital'
+  | 'service'
+  | 'other'
+
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
 export interface OnboardingData {
@@ -73,12 +83,25 @@ export interface CostItem {
   amount: number
 }
 
+export interface ProductVariant {
+  id: string
+  color: string
+  size: string
+  sku: string
+  stock: number
+}
+
 export interface Product {
   id: string
   projectId: string
   name: string
   code: string
+  category: ProductCategory
+  colors: string[]
+  sizes: string[]
+  variants: ProductVariant[]
   sellingPrice: number
+  wholesalePrice: number
   unitCost: number
   additionalCosts: CostItem[]
   monthlyFixedCost: number
@@ -89,6 +112,7 @@ export interface Product {
   status: ProductStatus
   expectedSalesVolume: number
   memo: string
+  imageUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -100,7 +124,7 @@ export interface ProductWithCalc extends Product {
   netMargin: number
 }
 
-// ─── Project (专用シート) ──────────────────────────────────────────────────────
+// ─── Project (専用シート) ──────────────────────────────────────────────────────
 
 export interface Project {
   id: string
@@ -144,15 +168,35 @@ export interface Document {
   createdAt: string
 }
 
+// ─── User Settings ────────────────────────────────────────────────────────────
+
+export interface UserSettings {
+  displayName: string
+  email: string
+  companyName: string
+  companyAddress: string
+  companyPhone: string
+  logoUrl: string
+  taxRate: number
+  defaultCurrency: string
+  defaultPaymentTerms: string
+  outputIncludeLogo: boolean
+  outputIncludeTax: boolean
+  outputFormat: 'a4' | 'letter'
+}
+
 // ─── Store State ─────────────────────────────────────────────────────────────
 
 export interface AppState {
   currentProject: Project | null
   onboarding: OnboardingData
   products: Product[]
+  projects: Project[]
   documents: Document[]
   selectedProductIds: string[]
   onboardingStep: number
+  settings: UserSettings
+  isSeeded: boolean
 }
 
 // ─── Column visibility ────────────────────────────────────────────────────────

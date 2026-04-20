@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const { currentProject, resetOnboarding } = useStore()
+  const { resetOnboarding } = useStore()
 
   const handleStart = () => {
     resetOnboarding()
@@ -11,7 +11,7 @@ export default function Welcome() {
   }
 
   const handleSample = () => {
-    navigate('/dashboard?sample=1')
+    navigate('/home')
   }
 
   return (
@@ -54,15 +54,13 @@ export default function Welcome() {
             >
               サンプルを見る
             </button>
-            {currentProject && (
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="w-full text-white/70 text-sm py-2 active:scale-95 transition-all"
-              >
-                → 作成済みシートに戻る
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate('/home')}
+              className="w-full text-white/70 text-sm py-2 active:scale-95 transition-all"
+            >
+              → ダッシュボードへ
+            </button>
           </div>
         </div>
       </div>

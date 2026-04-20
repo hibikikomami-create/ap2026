@@ -41,7 +41,12 @@ export default function StepResult() {
       projectId: project.id,
       name: onboarding.productName || '商品名未設定',
       code: onboarding.productCode || '',
+      category: 'other',
+      colors: [],
+      sizes: [],
+      variants: [],
       sellingPrice: onboarding.sellingPrice ?? 0,
+      wholesalePrice: 0,
       unitCost: onboarding.unitCost ?? 0,
       additionalCosts: [],
       monthlyFixedCost: onboarding.monthlyFixedCost ?? 0,
@@ -54,7 +59,7 @@ export default function StepResult() {
       memo: '',
     })
 
-    navigate('/dashboard')
+    navigate('/sheet-result')
   }
 
   const isProfit = result.netProfit >= 0
