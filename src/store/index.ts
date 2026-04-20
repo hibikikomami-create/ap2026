@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../lib/nanoid'
 import {
   SAMPLE_PRODUCTS,
@@ -7,6 +7,7 @@ import {
   SAMPLE_DOCUMENTS,
   SAMPLE_SETTINGS,
 } from '../lib/sampleData'
+import { safeSave, safeLoad, trimDocuments, trimProducts, STORAGE_KEY, isStorageNearLimit } from '../lib/storage'
 import type {
   AppState,
   OnboardingData,
@@ -188,14 +189,30 @@ export const useStore = create<Store>()(
         set((s) => ({ settings: { ...s.settings, ...patch } })),
     }),
     {
-      name: 'ap2026-store',
+      name: STORAGE_KEY,
+      // カスタムストレージアダプタ: try-catch でクォータ超過を安全に処理
+      storage: createJSONStorage(() => ({
+        getItem: (key) => safeLoad(key),
+        setItem: (key, value) => {
+          if (isStorageNearLimit()) {
+            console.warn('[store] Storage near limit (>3MB). Consider clearing old data.')
+          }
+          safeSave(key, value)
+        },
+        removeItem: (key) => {
+          try { localStorage.removeItem(key) } catch { /* ignore */ }
+        },
+      })),
+      // 永続化する項目のみを限定（UI状態は除外して容量を節約）
       partialize: (s) => ({
         currentProject: s.currentProject,
-        products: s.products,
+        // 件数が多い場合は古いものからトリミング
+        products: trimProducts(s.products),
         projects: s.projects,
-        documents: s.documents,
+        documents: trimDocuments(s.documents),
         settings: s.settings,
         isSeeded: s.isSeeded,
+        // selectedProductIds / onboarding / onboardingStep は永続化しない
       }),
     }
   )
