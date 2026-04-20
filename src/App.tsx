@@ -1,5 +1,9 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
+import { AuthGuard } from './components/AuthGuard'
+import { ToastContainer } from './components/common/Toast'
+import { useAuthStore } from './store/authStore'
 import Welcome from './pages/Welcome'
 import Home from './pages/Home'
 import Step1BusinessType from './pages/Onboarding/Step1BusinessType'
@@ -13,12 +17,29 @@ import Dashboard from './pages/Dashboard'
 import ProductDetail from './pages/ProductDetail'
 import DocumentsNew from './pages/Documents'
 import Settings from './pages/Settings'
+import LoginPage from './pages/Login'
+import SignupPage from './pages/Signup'
+
+function AuthInit() {
+  const initAuth = useAuthStore((s) => s.initAuth)
+  useEffect(() => {
+    const unsubscribe = initAuth()
+    return unsubscribe
+  }, [initAuth])
+  return null
+}
 
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthInit />
+      <ToastContainer />
       <AppShell>
         <Routes>
+          {/* Public auth routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+
           {/* Landing */}
           <Route path="/" element={<Welcome />} />
 
@@ -33,12 +54,12 @@ export default function App() {
           {/* Sheet generated — full screen */}
           <Route path="/sheet-result" element={<SheetResult />} />
 
-          {/* App shell pages */}
-          <Route path="/home" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
-          <Route path="/documents/new" element={<DocumentsNew />} />
-          <Route path="/settings" element={<Settings />} />
+          {/* Protected app shell pages */}
+          <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/products/:id" element={<AuthGuard><ProductDetail /></AuthGuard>} />
+          <Route path="/documents/new" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
+          <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/home" replace />} />
