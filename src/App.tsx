@@ -67,6 +67,7 @@ export default function App() {
           {/* Documents */}
           <Route path="/documents" element={<AuthGuard><DocumentsList /></AuthGuard>} />
           <Route path="/documents/new" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
+          <Route path="/documents/:id" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
 
           {/* Settings */}
           <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />

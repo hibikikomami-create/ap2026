@@ -29,7 +29,9 @@ export function Toast({ message, type = 'info', duration = 4000, onClose }: Toas
 
   return (
     <div
-      className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl text-white text-sm shadow-lg max-w-xs w-full text-center ${colorClass}`}
+      className={`fixed z-50 px-5 py-3 rounded-xl text-white text-sm shadow-lg max-w-xs w-full text-center
+        bottom-20 left-1/2 -translate-x-1/2
+        md:bottom-6 md:right-6 md:left-auto md:translate-x-0 md:text-left ${colorClass}`}
       role="alert"
     >
       {message}
@@ -51,7 +53,8 @@ export function ToastContainer() {
   _setToasts = setToasts
 
   return (
-    <div className="fixed bottom-20 left-0 right-0 flex flex-col items-center gap-2 z-50 pointer-events-none">
+    <div className="fixed bottom-20 left-0 right-0 flex flex-col items-center gap-2 z-50 pointer-events-none
+      md:bottom-6 md:right-6 md:left-auto md:items-end">
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <Toast

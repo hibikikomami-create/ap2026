@@ -44,7 +44,7 @@ export default function ProductDetail() {
 
   const existing = !isNew ? products.find((p) => p.id === id) : null
 
-  const [nameError, setNameError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<{ name?: string; sellingPrice?: string; expectedSalesVolume?: string }>({})
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -86,12 +86,18 @@ export default function ProductDetail() {
 
   const handleSave = async (opts?: { draft?: boolean }) => {
     const draft = opts?.draft ?? false
-    if (!form.name.trim()) {
-      setNameError('商品名を入力してください')
-      showToast('商品名を入力してください', 'error')
+    const next: typeof errors = {}
+    if (!form.name.trim()) next.name = '商品名を入力してください'
+    if (!draft) {
+      if (!form.sellingPrice || form.sellingPrice <= 0) next.sellingPrice = '販売価格を入力してください'
+      if (!form.expectedSalesVolume || form.expectedSalesVolume <= 0) next.expectedSalesVolume = '想定販売数を入力してください'
+    }
+    setErrors(next)
+    if (next.name || next.sellingPrice || next.expectedSalesVolume) {
+      showToast(next.name ?? next.sellingPrice ?? next.expectedSalesVolume ?? '入力内容を確認してください', 'error')
       return
     }
-    setNameError(null)
+    setErrors({})
     setSaving(true)
     try {
       const payload = draft ? { ...form, status: 'draft' as ProductStatus } : form
@@ -247,16 +253,16 @@ export default function ProductDetail() {
               <label className="label">商品名 <span className="text-brand-500">*</span></label>
               <input
                 type="text"
-                className={`input-field ${nameError ? 'border-red-400 focus:ring-red-300' : ''}`}
+                className={`input-field ${errors.name ? 'border-red-400 focus:ring-red-300' : ''}`}
                 placeholder="例：アロマキャンドル ラベンダー S"
                 value={form.name}
                 onChange={(e) => {
                   upd({ name: e.target.value })
-                  if (nameError) setNameError(null)
+                  if (errors.name) setErrors((x) => ({ ...x, name: undefined }))
                 }}
               />
-              {nameError && (
-                <p className="mt-1 text-xs text-red-500">{nameError}</p>
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-500">{errors.name}</p>
               )}
             </div>
 
@@ -363,13 +369,21 @@ export default function ProductDetail() {
           <div className="card p-4 space-y-4">
             <div className="section-title">価格</div>
             <div className="grid grid-cols-2 gap-4">
-              <NumberInput
-                label="上代（販売価格）"
-                value={form.sellingPrice}
-                onChange={(v) => upd({ sellingPrice: v ?? 0 })}
-                prefix="¥"
-                required
-              />
+              <div>
+                <NumberInput
+                  label="上代（販売価格）"
+                  value={form.sellingPrice}
+                  onChange={(v) => {
+                    upd({ sellingPrice: v ?? 0 })
+                    if (errors.sellingPrice) setErrors((x) => ({ ...x, sellingPrice: undefined }))
+                  }}
+                  prefix="¥"
+                  required
+                />
+                {errors.sellingPrice && (
+                  <p className="mt-1 text-xs text-red-500">{errors.sellingPrice}</p>
+                )}
+              </div>
               <NumberInput
                 label="卸価格"
                 value={form.wholesalePrice}
@@ -378,13 +392,21 @@ export default function ProductDetail() {
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <NumberInput
-                label="想定販売数（月間）"
-                value={form.expectedSalesVolume}
-                onChange={(v) => upd({ expectedSalesVolume: v ?? 1 })}
-                suffix="個"
-                required
-              />
+              <div>
+                <NumberInput
+                  label="想定販売数（月間）"
+                  value={form.expectedSalesVolume}
+                  onChange={(v) => {
+                    upd({ expectedSalesVolume: v ?? 1 })
+                    if (errors.expectedSalesVolume) setErrors((x) => ({ ...x, expectedSalesVolume: undefined }))
+                  }}
+                  suffix="個"
+                  required
+                />
+                {errors.expectedSalesVolume && (
+                  <p className="mt-1 text-xs text-red-500">{errors.expectedSalesVolume}</p>
+                )}
+              </div>
               <NumberInput
                 label="値引率"
                 value={form.discountRate}

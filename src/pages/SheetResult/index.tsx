@@ -42,7 +42,7 @@ export default function SheetResult() {
           <div className="space-y-3 w-full">
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/products')}
               className="w-full bg-white text-brand-700 font-bold py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all hover:bg-brand-50"
             >
               商品一覧を確認する

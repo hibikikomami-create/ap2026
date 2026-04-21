@@ -11,11 +11,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const formValid = emailValid && password.length > 0
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!email.trim()) { setError('メールアドレスを入力してください'); return }
+    if (!emailValid) { setError('メールアドレスの形式が正しくありません'); return }
     if (!password) { setError('パスワードを入力してください'); return }
 
     setLoading(true)
@@ -85,7 +89,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formValid}
               className="w-full py-2.5 bg-brand text-white rounded-lg font-medium text-sm hover:bg-brand/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && (

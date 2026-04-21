@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../../store'
 import { nanoid } from '../../lib/nanoid'
 import { exportDocumentToPDF } from '../../lib/exporters/pdf'
@@ -10,25 +10,75 @@ import { fmt } from '../../lib/calculations'
 
 export default function DocumentsNew() {
   const navigate = useNavigate()
-  const { products, selectedProductIds, currentProject, addDocument, clearSelection } = useStore()
+  const { id: editId } = useParams<{ id?: string }>()
+  const {
+    products,
+    selectedProductIds,
+    currentProject,
+    projects,
+    documents,
+    addDocument,
+    updateDocument,
+    clearSelection,
+    setCurrentProject,
+    createProject,
+  } = useStore()
+
+  const editingDoc = editId ? documents.find((d) => d.id === editId) ?? null : null
+  const isEdit = !!editingDoc
+
+  // currentProject が null の場合の自動リカバリ（プロジェクト選択 or デフォルト作成）
+  useEffect(() => {
+    if (currentProject) return
+    if (projects.length > 0) {
+      setCurrentProject(projects[0])
+    } else {
+      createProject({
+        name: 'マイシート',
+        businessType: 'product',
+        salesChannels: [],
+        userRole: 'owner',
+        selectedCostItems: [],
+      })
+    }
+  }, [currentProject, projects, setCurrentProject, createProject])
+
+  // 編集モードで該当IDが見つからない場合、一覧へ戻す
+  useEffect(() => {
+    if (editId && !editingDoc) {
+      showToast('発注書が見つかりませんでした', 'error')
+      navigate('/documents', { replace: true })
+    }
+  }, [editId, editingDoc, navigate])
+
+  // 新規作成時: 選択中の商品を明細に取り込んだら、商品一覧の選択状態を即座にクリア
+  useEffect(() => {
+    if (!isEdit && selectedProductIds.length > 0) {
+      clearSelection()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const preSelected = products.filter((p) => selectedProductIds.includes(p.id))
 
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10))
-  const [dueDate, setDueDate] = useState('')
-  const [recipientName, setRecipientName] = useState('')
-  const [issuerName, setIssuerName] = useState('')
-  const [memo, setMemo] = useState('')
+  const [issueDate, setIssueDate] = useState(
+    editingDoc?.issueDate ?? new Date().toISOString().slice(0, 10)
+  )
+  const [dueDate, setDueDate] = useState(editingDoc?.dueDate ?? '')
+  const [recipientName, setRecipientName] = useState(editingDoc?.recipientName ?? '')
+  const [issuerName, setIssuerName] = useState(editingDoc?.issuerName ?? '')
+  const [memo, setMemo] = useState(editingDoc?.memo ?? '')
   const [items, setItems] = useState<DocumentItem[]>(
-    preSelected.map((p) => ({
-      productId: p.id,
-      productName: p.name,
-      productCode: p.code,
-      quantity: 1,
-      unitPrice: p.sellingPrice,
-      subtotal: p.sellingPrice,
-      memo: '',
-    }))
+    editingDoc?.items ??
+      preSelected.map((p) => ({
+        productId: p.id,
+        productName: p.name,
+        productCode: p.code,
+        quantity: 1,
+        unitPrice: p.sellingPrice,
+        subtotal: p.sellingPrice,
+        memo: '',
+      }))
   )
   const [exporting, setExporting] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -68,10 +118,10 @@ export default function DocumentsNew() {
   }
 
   const buildDoc = (): Document => ({
-    id: nanoid(),
-    projectId: currentProject?.id ?? '',
+    id: editingDoc?.id ?? nanoid(),
+    projectId: editingDoc?.projectId ?? currentProject?.id ?? (projects[0]?.id ?? ''),
     type: 'purchase_order',
-    title: '発注書',
+    title: editingDoc?.title ?? '発注書',
     issueDate,
     dueDate,
     recipientName,
@@ -81,8 +131,13 @@ export default function DocumentsNew() {
     tax,
     total,
     memo,
-    createdAt: new Date().toISOString(),
+    createdAt: editingDoc?.createdAt ?? new Date().toISOString(),
   })
+
+  const persistDoc = (doc: Document) => {
+    if (isEdit) updateDocument(doc.id, doc)
+    else addDocument(doc)
+  }
 
   const validate = (): boolean => {
     const next: typeof errors = {}
@@ -97,16 +152,41 @@ export default function DocumentsNew() {
   }
 
   const handleSaveDraft = async () => {
-    if (!recipientName.trim() && items.length === 0) {
-      showToast('発注先または明細を入力してください', 'error')
+    if (!recipientName.trim() || items.length === 0) {
+      const msg = !recipientName.trim()
+        ? '発注先名を入力してください'
+        : '明細を1件以上追加してください'
+      setErrors({
+        recipient: !recipientName.trim() ? msg : undefined,
+        items: items.length === 0 ? '明細を1件以上追加してください' : undefined,
+      })
+      showToast(msg, 'error')
       return
     }
+    setErrors({})
     setSaving(true)
     try {
       const doc = buildDoc()
-      addDocument({ ...doc, title: `${doc.title}（下書き）` })
+      const draftTitle = doc.title.includes('（下書き）')
+        ? doc.title
+        : `${doc.title}（下書き）`
+      persistDoc({ ...doc, title: draftTitle })
       clearSelection()
-      showToast('下書きとして保存しました', 'success')
+      showToast(isEdit ? '下書きを更新しました' : '下書きとして保存しました', 'success')
+      await new Promise((r) => setTimeout(r, 120))
+      navigate('/documents')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!validate()) return
+    setSaving(true)
+    try {
+      persistDoc(buildDoc())
+      clearSelection()
+      showToast(isEdit ? '発注書を更新しました' : '発注書を保存しました', 'success')
       await new Promise((r) => setTimeout(r, 120))
       navigate('/documents')
     } finally {
@@ -117,7 +197,7 @@ export default function DocumentsNew() {
   const handleSaveAndExportPDF = async () => {
     if (!validate()) return
     const doc = buildDoc()
-    addDocument(doc)
+    persistDoc(doc)
     clearSelection()
     setExporting(true)
     try {
@@ -135,7 +215,7 @@ export default function DocumentsNew() {
     if (!validate()) return
     try {
       const doc = buildDoc()
-      addDocument(doc)
+      persistDoc(doc)
       clearSelection()
       exportDocumentToExcel(doc)
       showToast('Excelを生成しました', 'success')
@@ -161,16 +241,28 @@ export default function DocumentsNew() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="font-bold text-gray-900 text-base truncate">発注書を作成</h1>
+            <h1 className="font-bold text-gray-900 text-base truncate">
+              {isEdit ? '発注書を編集' : '発注書を作成'}
+            </h1>
           </div>
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={saving || exporting}
-            className="text-sm px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            下書き保存
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={saving || exporting}
+              className="text-sm px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              下書き保存
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || exporting}
+              className="text-sm px-3 py-2 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {saving ? '保存中...' : isEdit ? '更新する' : '保存する'}
+            </button>
+          </div>
         </div>
       </div>
 

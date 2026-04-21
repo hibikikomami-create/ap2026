@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
 import { showToast } from '../../components/common/Toast'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
@@ -13,6 +14,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function Settings() {
+  const navigate = useNavigate()
   const { settings, updateSettings, resetAllData } = useStore()
   const [tab, setTab] = useState<Tab>('user')
   const [saving, setSaving] = useState(false)
@@ -44,6 +46,7 @@ export default function Settings() {
       resetAllData()
       await new Promise((r) => setTimeout(r, 200))
       showToast('すべてのデータを削除しました', 'success')
+      navigate('/home')
     } finally {
       setResetting(false)
       setResetOpen(false)

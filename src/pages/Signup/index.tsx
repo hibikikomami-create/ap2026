@@ -13,12 +13,20 @@ export default function SignupPage() {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const formValid =
+    displayName.trim().length > 0 &&
+    emailValid &&
+    password.length >= 6 &&
+    password === confirmPassword
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!displayName.trim()) { setError('表示名を入力してください'); return }
     if (!email.trim()) { setError('メールアドレスを入力してください'); return }
+    if (!emailValid) { setError('メールアドレスの形式が正しくありません'); return }
     if (!password) { setError('パスワードを入力してください'); return }
     if (password.length < 6) { setError('パスワードは6文字以上で設定してください'); return }
     if (password !== confirmPassword) { setError('パスワードが一致しません'); return }
@@ -141,7 +149,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formValid}
               className="w-full py-2.5 bg-brand text-white rounded-lg font-medium text-sm hover:bg-brand/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && (
