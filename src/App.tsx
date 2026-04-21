@@ -13,8 +13,9 @@ import Step4CostItems from './pages/Onboarding/Step4CostItems'
 import Step5Numbers from './pages/Onboarding/Step5Numbers'
 import StepResult from './pages/Onboarding/StepResult'
 import SheetResult from './pages/SheetResult'
-import Dashboard from './pages/Dashboard'
+import ProductsPage from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
+import DocumentsList from './pages/Documents/List'
 import DocumentsNew from './pages/Documents'
 import Settings from './pages/Settings'
 import LoginPage from './pages/Login'
@@ -36,14 +37,14 @@ export default function App() {
       <ToastContainer />
       <AppShell>
         <Routes>
-          {/* Public auth routes */}
+          {/* Public auth routes (full-screen) */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
 
           {/* Landing */}
           <Route path="/" element={<Welcome />} />
 
-          {/* Onboarding wizard — full screen */}
+          {/* Onboarding wizard (full-screen) */}
           <Route path="/onboarding/1" element={<Step1BusinessType />} />
           <Route path="/onboarding/2" element={<Step2SalesChannel />} />
           <Route path="/onboarding/3" element={<Step3UserRole />} />
@@ -51,15 +52,26 @@ export default function App() {
           <Route path="/onboarding/5" element={<Step5Numbers />} />
           <Route path="/onboarding/result" element={<StepResult />} />
 
-          {/* Sheet generated — full screen */}
+          {/* Sheet result (full-screen) */}
           <Route path="/sheet-result" element={<SheetResult />} />
 
-          {/* Protected app shell pages */}
+          {/* Protected app pages */}
           <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />
-          <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
+
+          {/* Products — canonical route */}
+          <Route path="/products" element={<AuthGuard><ProductsPage /></AuthGuard>} />
+          <Route path="/products/new" element={<AuthGuard><ProductDetail /></AuthGuard>} />
           <Route path="/products/:id" element={<AuthGuard><ProductDetail /></AuthGuard>} />
+
+          {/* Documents */}
+          <Route path="/documents" element={<AuthGuard><DocumentsList /></AuthGuard>} />
           <Route path="/documents/new" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
+
+          {/* Settings */}
           <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
+
+          {/* Legacy redirect from old /dashboard route */}
+          <Route path="/dashboard" element={<Navigate to="/products" replace />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/home" replace />} />

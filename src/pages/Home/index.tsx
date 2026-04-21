@@ -1,18 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
+import { useAuthStore } from '../../store/authStore'
 import { calcProduct, fmt, fmtPct } from '../../lib/calculations'
 import { statusBadge } from '../../components/common/Badge'
-import { SAMPLE_CALC } from '../../lib/sampleData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { products, projects, documents, currentProject, settings } = useStore()
+  const { products, projects, documents, settings } = useStore()
+  const { currentUser } = useAuthStore()
 
   const activeProducts = products.filter((p) => p.status === 'active')
-  const totalRevenue = products.reduce((s, p) => {
-    const c = calcProduct(p)
-    return s + c.grossProfit
-  }, 0)
+  const totalGrossProfit = products.reduce((s, p) => s + calcProduct(p).grossProfit, 0)
   const avgMargin =
     products.length > 0
       ? products.reduce((s, p) => s + calcProduct(p).grossMargin, 0) / products.length
@@ -20,264 +18,256 @@ export default function Home() {
 
   const recentProducts = [...products]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 4)
+    .slice(0, 5)
 
   const recentDocs = [...documents]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 2)
+    .slice(0, 5)
 
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'おはようございます' : hour < 17 ? 'こんにちは' : 'お疲れさまです'
+  const displayName = currentUser?.user_metadata?.display_name || settings.displayName || 'ユーザー'
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Greeting */}
-      <div>
-        <p className="text-sm text-gray-400">{greeting}</p>
-        <h1 className="text-2xl font-bold text-gray-900 mt-0.5">
-          {settings.displayName ? `${settings.displayName} さん` : 'マイページ'}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {currentProject?.name || 'プロジェクト未選択'}
-        </p>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryCard
-          label="商品数"
-          value={`${products.length}`}
-          sub={`うち販売中 ${activeProducts.length}件`}
-          color="brand"
-        />
-        <SummaryCard
-          label="月間粗利見込み"
-          value={fmt(totalRevenue)}
-          sub="全商品合計"
-          color="green"
-        />
-        <SummaryCard
-          label="平均粗利率"
-          value={fmtPct(avgMargin)}
-          sub="全商品平均"
-          color={avgMargin >= 30 ? 'green' : avgMargin >= 15 ? 'yellow' : 'red'}
-        />
-        <SummaryCard
-          label="プロジェクト数"
-          value={`${projects.length}`}
-          sub={`発注書 ${documents.length}件`}
-          color="purple"
-        />
-      </div>
-
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          クイックアクション
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <QuickAction
-            icon="➕"
-            label="商品を追加"
-            desc="新しい商品を登録する"
+    <div className="min-h-screen">
+      {/* Page header */}
+      <div className="page-header">
+        <div className="page-header-inner">
+          <div>
+            <h1 className="page-title">ダッシュボード</h1>
+            <p className="page-subtitle">{displayName} さん、{greeting()} 。</p>
+          </div>
+          <button
+            type="button"
             onClick={() => navigate('/products/new')}
-          />
-          <QuickAction
-            icon="🧮"
-            label="収益を試算"
-            desc="オンボーディングで試算"
-            onClick={() => navigate('/onboarding/1')}
-          />
-          <QuickAction
-            icon="📄"
-            label="発注書を作成"
-            desc="商品を選んで帳票生成"
-            onClick={() => navigate('/documents/new')}
-          />
-          <QuickAction
-            icon="📊"
-            label="商品一覧を見る"
-            desc="商品の管理・編集"
-            onClick={() => navigate('/dashboard')}
-          />
-        </div>
-      </div>
-
-      {/* Trial calc result (always shown as sample insight) */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          直近の試算
-        </h2>
-        <div className="card p-4 bg-gradient-to-br from-brand-50 to-white">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <div className="font-semibold text-gray-900 text-sm">{SAMPLE_CALC.productName}</div>
-              <div className="text-xs text-gray-400 mt-0.5">試算サンプル</div>
-            </div>
-            <span className="badge bg-green-100 text-green-700">良好</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <div className="text-xs text-gray-400 mb-0.5">月間売上見込み</div>
-              <div className="font-bold text-gray-900 text-base">{fmt(SAMPLE_CALC.revenue)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-400 mb-0.5">粗利率</div>
-              <div className="font-bold text-green-600 text-base">{fmtPct(SAMPLE_CALC.grossMargin)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-400 mb-0.5">損益分岐点</div>
-              <div className="font-bold text-gray-900 text-base">{SAMPLE_CALC.breakEvenVolume}個</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/onboarding/1')}
-            className="mt-3 text-xs text-brand-600 font-medium hover:underline"
+            className="btn-primary flex items-center gap-1.5"
           >
-            → 新しく試算する
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            商品追加
           </button>
         </div>
       </div>
 
-      {/* Recent products */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            最近の商品
-          </h2>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="text-xs text-brand-600 font-medium"
-          >
-            すべて見る →
-          </button>
+      <div className="page-content space-y-6">
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="登録商品"
+            value={`${products.length}`}
+            sub={`販売中 ${activeProducts.length}件`}
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" />
+              </svg>
+            }
+          />
+          <KpiCard
+            label="月間粗利見込み"
+            value={fmt(totalGrossProfit)}
+            sub="全商品合計"
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            highlight
+          />
+          <KpiCard
+            label="平均粗利率"
+            value={fmtPct(avgMargin)}
+            sub="全商品平均"
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            }
+            warn={avgMargin < 15}
+          />
+          <KpiCard
+            label="発注書"
+            value={`${documents.length}`}
+            sub={`プロジェクト ${projects.length}件`}
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+          />
         </div>
-        <div className="space-y-2">
-          {recentProducts.map((product) => {
-            const calc = calcProduct(product)
-            return (
-              <button
-                key={product.id}
-                type="button"
-                onClick={() => navigate(`/products/${product.id}`)}
-                className="w-full card p-3 text-left flex items-center gap-3 hover:shadow-md transition-shadow active:scale-99"
-              >
-                <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-lg
-                  ${product.category === 'apparel' ? 'bg-blue-100' :
-                    product.category === 'home' ? 'bg-purple-100' :
-                    product.category === 'food' ? 'bg-orange-100' : 'bg-gray-100'}`}
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent products */}
+          <div className="lg:col-span-2">
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-800">最近の商品</h2>
+                <button
+                  type="button"
+                  onClick={() => navigate('/products')}
+                  className="text-xs text-brand-600 hover:underline"
                 >
-                  {product.category === 'apparel' ? '👗' :
-                   product.category === 'home' ? '🕯️' :
-                   product.category === 'food' ? '🍱' : '📦'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm truncate">{product.name}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{product.code}</div>
-                </div>
-                <div className="flex-shrink-0 text-right">
-                  <div className="font-semibold text-gray-900 text-sm">{fmt(product.sellingPrice)}</div>
-                  <div className={`text-xs font-medium mt-0.5
-                    ${calc.grossMargin >= 30 ? 'text-green-600' :
-                      calc.grossMargin >= 15 ? 'text-yellow-600' : 'text-red-500'}`}
+                  すべて表示
+                </button>
+              </div>
+              {recentProducts.length === 0 ? (
+                <div className="px-4 py-10 text-center text-slate-400 text-sm">
+                  商品がまだ登録されていません
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => navigate('/products/new')}
+                    className="mt-3 text-brand-600 underline text-sm"
                   >
-                    {fmtPct(calc.grossMargin)}
-                  </div>
+                    最初の商品を追加する
+                  </button>
                 </div>
-                <div className="flex-shrink-0">{statusBadge(product.status)}</div>
-              </button>
-            )
-          })}
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>商品名</th>
+                      <th className="hidden sm:table-cell">品番</th>
+                      <th>上代</th>
+                      <th>粗利率</th>
+                      <th>ステータス</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentProducts.map((product) => {
+                      const calc = calcProduct(product)
+                      return (
+                        <tr
+                          key={product.id}
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/products/${product.id}`)}
+                        >
+                          <td className="font-medium text-slate-900">{product.name}</td>
+                          <td className="hidden sm:table-cell text-slate-500 font-mono text-xs">{product.code}</td>
+                          <td className="tabular-nums">{fmt(product.sellingPrice)}</td>
+                          <td className={`tabular-nums font-medium
+                            ${calc.grossMargin >= 30 ? 'text-green-600' : calc.grossMargin >= 15 ? 'text-amber-600' : 'text-red-500'}`}
+                          >
+                            {fmtPct(calc.grossMargin)}
+                          </td>
+                          <td>{statusBadge(product.status)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Right column */}
+          <div className="space-y-4">
+            {/* Quick actions */}
+            <div className="card p-4">
+              <h2 className="text-sm font-semibold text-slate-800 mb-3">クイックアクション</h2>
+              <div className="space-y-1.5">
+                <QuickLink
+                  label="商品を追加"
+                  desc="新規商品の登録"
+                  onClick={() => navigate('/products/new')}
+                />
+                <QuickLink
+                  label="発注書を作成"
+                  desc="商品を選んで帳票生成"
+                  onClick={() => navigate('/documents/new')}
+                />
+                <QuickLink
+                  label="収益を試算"
+                  desc="シミュレーション開始"
+                  onClick={() => navigate('/onboarding/1')}
+                />
+              </div>
+            </div>
+
+            {/* Recent documents */}
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-800">最近の発注書</h2>
+                <button
+                  type="button"
+                  onClick={() => navigate('/documents')}
+                  className="text-xs text-brand-600 hover:underline"
+                >
+                  すべて表示
+                </button>
+              </div>
+              {recentDocs.length === 0 ? (
+                <div className="px-4 py-6 text-center text-slate-400 text-sm">発注書がありません</div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {recentDocs.map((doc) => (
+                    <div key={doc.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-slate-900 truncate">{doc.title}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{doc.recipientName} · {doc.issueDate}</div>
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900 shrink-0 tabular-nums">
+                          {fmt(doc.total)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Recent documents */}
-      {recentDocs.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              最近の発注書
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate('/documents/new')}
-              className="text-xs text-brand-600 font-medium"
-            >
-              新規作成 →
-            </button>
-          </div>
-          <div className="space-y-2">
-            {recentDocs.map((doc) => (
-              <div key={doc.id} className="card p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-lg flex-shrink-0">
-                  📄
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm">{doc.title}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{doc.recipientName} · {doc.issueDate}</div>
-                </div>
-                <div className="flex-shrink-0 text-right">
-                  <div className="font-bold text-brand-700 text-sm">{fmt(doc.total)}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{doc.items.length}品目</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Bottom spacer for mobile nav */}
-      <div className="h-4" />
     </div>
   )
 }
 
-function SummaryCard({
-  label, value, sub, color,
+function greeting() {
+  const h = new Date().getHours()
+  return h < 12 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'お疲れさまです'
+}
+
+function KpiCard({
+  label, value, sub, icon, highlight, warn,
 }: {
-  label: string; value: string; sub: string; color: 'brand' | 'green' | 'yellow' | 'red' | 'purple'
+  label: string
+  value: string
+  sub: string
+  icon: React.ReactNode
+  highlight?: boolean
+  warn?: boolean
 }) {
-  const colorClass = {
-    brand: 'from-brand-50',
-    green: 'from-green-50',
-    yellow: 'from-yellow-50',
-    red: 'from-red-50',
-    purple: 'from-purple-50',
-  }[color]
-  const valueClass = {
-    brand: 'text-brand-700',
-    green: 'text-green-700',
-    yellow: 'text-yellow-700',
-    red: 'text-red-600',
-    purple: 'text-purple-700',
-  }[color]
   return (
-    <div className={`card p-3 bg-gradient-to-br ${colorClass} to-white`}>
-      <div className="text-xs text-gray-500 mb-1 leading-tight">{label}</div>
-      <div className={`font-bold text-lg leading-tight ${valueClass}`}>{value}</div>
-      <div className="text-xs text-gray-400 mt-0.5 leading-tight">{sub}</div>
+    <div className="card px-4 py-4">
+      <div className="flex items-start justify-between">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className={`p-1.5 rounded-md ${highlight ? 'bg-brand-50 text-brand-600' : warn ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-400'}`}>
+          {icon}
+        </div>
+      </div>
+      <div className={`text-2xl font-semibold mt-2 tabular-nums ${warn ? 'text-red-600' : 'text-slate-900'}`}>
+        {value}
+      </div>
+      <div className="text-xs text-slate-400 mt-1">{sub}</div>
     </div>
   )
 }
 
-function QuickAction({
-  icon, label, desc, onClick,
-}: {
-  icon: string; label: string; desc: string; onClick: () => void
-}) {
+function QuickLink({ label, desc, onClick }: { label: string; desc: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card p-4 text-left active:scale-98 transition-all hover:shadow-md group"
+      className="w-full flex items-center justify-between px-3 py-2.5 rounded-md hover:bg-slate-50 transition-colors text-left group"
     >
-      <div className="text-2xl mb-2">{icon}</div>
-      <div className="font-semibold text-gray-900 text-sm group-hover:text-brand-700 transition-colors">
-        {label}
+      <div>
+        <div className="text-sm font-medium text-slate-800 group-hover:text-brand-700">{label}</div>
+        <div className="text-xs text-slate-400">{desc}</div>
       </div>
-      <div className="text-xs text-gray-400 mt-0.5">{desc}</div>
+      <svg className="w-4 h-4 text-slate-300 group-hover:text-brand-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
     </button>
   )
 }
