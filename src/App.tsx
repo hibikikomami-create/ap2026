@@ -20,6 +20,7 @@ import DocumentsNew from './pages/Documents'
 import Settings from './pages/Settings'
 import LoginPage from './pages/Login'
 import SignupPage from './pages/Signup'
+import WebDashboardPreview from './pages/Preview/WebDashboard'
 
 function AuthInit() {
   const initAuth = useAuthStore((s) => s.initAuth)
@@ -69,6 +70,9 @@ export default function App() {
 
           {/* Settings */}
           <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
+
+          {/* Preview/test pages */}
+          <Route path="/preview/web-dashboard" element={<AuthGuard><WebDashboardPreview /></AuthGuard>} />
 
           {/* Legacy redirect from old /dashboard route */}
           <Route path="/dashboard" element={<Navigate to="/products" replace />} />

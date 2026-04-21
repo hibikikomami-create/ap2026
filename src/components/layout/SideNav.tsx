@@ -117,7 +117,7 @@ export function SideNav({ onClose }: Props) {
         </div>
 
         <div className="mt-6">
-          <div className="text-xs font-medium text-slate-400 px-3 mb-2">試算</div>
+          <div className="text-xs font-medium text-slate-400 px-3 mb-2">ツール</div>
           <button
             type="button"
             onClick={() => handleNav('/onboarding/1')}
@@ -129,6 +129,23 @@ export function SideNav({ onClose }: Props) {
               </svg>
             </span>
             収益シミュレーション
+          </button>
+          <button
+            type="button"
+            onClick={() => handleNav('/preview/web-dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors text-left
+              ${location.pathname === '/preview/web-dashboard'
+                ? 'bg-brand-50 text-brand-700 font-medium'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+              }`}
+          >
+            <span className={location.pathname === '/preview/web-dashboard' ? 'text-brand-500' : 'text-slate-300'}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <span className="flex-1">UIプレビュー</span>
+            <span className="text-[10px] font-medium bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">β</span>
           </button>
         </div>
       </nav>
