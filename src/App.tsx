@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { AuthGuard } from './components/AuthGuard'
 import { ToastContainer } from './components/common/Toast'
@@ -33,7 +33,7 @@ function AuthInit() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthInit />
       <ToastContainer />
       <AppShell>
@@ -81,6 +81,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </AppShell>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
