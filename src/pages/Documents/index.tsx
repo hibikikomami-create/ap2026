@@ -4,6 +4,7 @@ import { useStore } from '../../store'
 import { nanoid } from '../../lib/nanoid'
 import { exportDocumentToPDF } from '../../lib/exporters/pdf'
 import { exportDocumentToExcel } from '../../lib/exporters/excel'
+import { showToast } from '../../components/common/Toast'
 import type { Document, DocumentItem } from '../../types'
 import { fmt } from '../../lib/calculations'
 
@@ -30,6 +31,8 @@ export default function DocumentsNew() {
     }))
   )
   const [exporting, setExporting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<{ recipient?: string; items?: string }>({})
 
   const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
   const tax = Math.round(subtotal * 0.1)
@@ -81,40 +84,93 @@ export default function DocumentsNew() {
     createdAt: new Date().toISOString(),
   })
 
+  const validate = (): boolean => {
+    const next: typeof errors = {}
+    if (!recipientName.trim()) next.recipient = '発注先名を入力してください'
+    if (items.length === 0) next.items = '明細を1件以上追加してください'
+    setErrors(next)
+    if (next.recipient || next.items) {
+      showToast(next.recipient ?? next.items ?? '入力内容を確認してください', 'error')
+      return false
+    }
+    return true
+  }
+
+  const handleSaveDraft = async () => {
+    if (!recipientName.trim() && items.length === 0) {
+      showToast('発注先または明細を入力してください', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      const doc = buildDoc()
+      addDocument({ ...doc, title: `${doc.title}（下書き）` })
+      clearSelection()
+      showToast('下書きとして保存しました', 'success')
+      await new Promise((r) => setTimeout(r, 120))
+      navigate('/documents')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleSaveAndExportPDF = async () => {
+    if (!validate()) return
     const doc = buildDoc()
     addDocument(doc)
     clearSelection()
     setExporting(true)
     try {
       await exportDocumentToPDF(doc)
+      showToast('PDFを生成しました', 'success')
+    } catch (e) {
+      showToast('PDF生成に失敗しました', 'error')
+      console.error(e)
     } finally {
       setExporting(false)
     }
   }
 
   const handleSaveAndExportExcel = () => {
-    const doc = buildDoc()
-    addDocument(doc)
-    clearSelection()
-    exportDocumentToExcel(doc)
+    if (!validate()) return
+    try {
+      const doc = buildDoc()
+      addDocument(doc)
+      clearSelection()
+      exportDocumentToExcel(doc)
+      showToast('Excelを生成しました', 'success')
+    } catch (e) {
+      showToast('Excel生成に失敗しました', 'error')
+      console.error(e)
+    }
   }
 
   return (
     <div className="min-h-svh bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate('/documents')}
+              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 transition-all"
+              aria-label="戻る"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="font-bold text-gray-900 text-base truncate">発注書を作成</h1>
+          </div>
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
-            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 active:scale-95 transition-all"
+            onClick={handleSaveDraft}
+            disabled={saving || exporting}
+            className="text-sm px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+            下書き保存
           </button>
-          <h1 className="font-bold text-gray-900 text-base">発注書を作成</h1>
         </div>
       </div>
 
@@ -125,14 +181,20 @@ export default function DocumentsNew() {
             <div className="section-title">発注書情報</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="label">発注先名</label>
+                <label className="label">発注先名 <span className="text-brand-500">*</span></label>
                 <input
                   type="text"
-                  className="input-field"
+                  className={`input-field ${errors.recipient ? 'border-red-400 focus:ring-red-300' : ''}`}
                   placeholder="株式会社○○"
                   value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
+                  onChange={(e) => {
+                    setRecipientName(e.target.value)
+                    if (errors.recipient) setErrors((x) => ({ ...x, recipient: undefined }))
+                  }}
                 />
+                {errors.recipient && (
+                  <p className="mt-1 text-xs text-red-500">{errors.recipient}</p>
+                )}
               </div>
               <div>
                 <label className="label">発注者名</label>
@@ -233,9 +295,9 @@ export default function DocumentsNew() {
               ))}
 
               {items.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
+                <div className={`text-center py-8 rounded-lg border border-dashed ${errors.items ? 'border-red-300 bg-red-50/40' : 'border-slate-200 text-gray-400'}`}>
                   <div className="text-3xl mb-2">📋</div>
-                  <div className="text-sm">「行を追加」で明細を追加してください</div>
+                  <div className="text-sm">{errors.items ?? '「行を追加」で明細を追加してください'}</div>
                 </div>
               )}
             </div>

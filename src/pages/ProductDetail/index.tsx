@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../../store'
 import { NumberInput } from '../../components/common/NumberInput'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { showToast } from '../../components/common/Toast'
 import { calcProduct, fmt, fmtPct } from '../../lib/calculations'
 import type { Product, ProductStatus, SalesChannel, ProductCategory } from '../../types'
 
@@ -38,9 +40,13 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const isNew = id === 'new'
 
-  const { currentProject, products, addProduct, updateProduct } = useStore()
+  const { currentProject, products, addProduct, updateProduct, deleteProduct, duplicateProduct } = useStore()
 
   const existing = !isNew ? products.find((p) => p.id === id) : null
+
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const [form, setForm] = useState<FormState>({
     projectId: currentProject?.id ?? '',
@@ -78,17 +84,45 @@ export default function ProductDetail() {
 
   const upd = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
 
-  const handleSave = () => {
+  const handleSave = async (opts?: { draft?: boolean }) => {
+    const draft = opts?.draft ?? false
     if (!form.name.trim()) {
-      alert('商品名を入力してください')
+      setNameError('商品名を入力してください')
+      showToast('商品名を入力してください', 'error')
       return
     }
-    if (isNew) {
-      addProduct(form)
-    } else if (id) {
-      updateProduct(id, form)
+    setNameError(null)
+    setSaving(true)
+    try {
+      const payload = draft ? { ...form, status: 'draft' as ProductStatus } : form
+      if (isNew) {
+        addProduct(payload)
+        showToast(draft ? '下書きとして保存しました' : '商品を追加しました', 'success')
+      } else if (id) {
+        updateProduct(id, payload)
+        showToast(draft ? '下書きとして保存しました' : '商品を更新しました', 'success')
+      }
+      // wait a tick so the toast is visible before navigation
+      await new Promise((r) => setTimeout(r, 120))
+      navigate('/products')
+    } finally {
+      setSaving(false)
     }
-    navigate('/dashboard')
+  }
+
+  const handleDelete = () => {
+    if (!id || isNew) return
+    deleteProduct(id)
+    showToast('商品を削除しました', 'success')
+    setDeleteOpen(false)
+    navigate('/products')
+  }
+
+  const handleDuplicate = () => {
+    if (!id || isNew) return
+    duplicateProduct(id)
+    showToast('商品を複製しました', 'success')
+    navigate('/products')
   }
 
   const toggleChannel = (ch: SalesChannel) => {
@@ -120,28 +154,63 @@ export default function ProductDetail() {
     <div className="flex flex-col min-h-svh bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 active:scale-95 transition-all"
+              onClick={() => navigate('/products')}
+              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 transition-all"
+              aria-label="戻る"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="font-bold text-gray-900 text-base">
+            <h1 className="font-bold text-gray-900 text-base truncate">
               {isNew ? '商品を追加' : '商品を編集'}
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="btn-primary py-2 px-5 text-sm"
-          >
-            保存
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {!isNew && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleDuplicate}
+                  disabled={saving}
+                  className="hidden sm:inline-flex text-sm px-3 py-2 rounded-md text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  複製
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={saving}
+                  className="hidden sm:inline-flex text-sm px-3 py-2 rounded-md text-red-500 hover:bg-red-50 disabled:opacity-50"
+                >
+                  削除
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => handleSave({ draft: true })}
+              disabled={saving}
+              className="text-sm px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              下書き保存
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              disabled={saving}
+              className="btn-primary py-2 px-4 text-sm flex items-center gap-2 disabled:opacity-60"
+            >
+              {saving && (
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              )}
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -178,11 +247,17 @@ export default function ProductDetail() {
               <label className="label">商品名 <span className="text-brand-500">*</span></label>
               <input
                 type="text"
-                className="input-field"
+                className={`input-field ${nameError ? 'border-red-400 focus:ring-red-300' : ''}`}
                 placeholder="例：アロマキャンドル ラベンダー S"
                 value={form.name}
-                onChange={(e) => upd({ name: e.target.value })}
+                onChange={(e) => {
+                  upd({ name: e.target.value })
+                  if (nameError) setNameError(null)
+                }}
               />
+              {nameError && (
+                <p className="mt-1 text-xs text-red-500">{nameError}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -383,15 +458,60 @@ export default function ProductDetail() {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            className="btn-primary w-full py-4 text-base"
-          >
-            保存する
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => handleSave({ draft: true })}
+              disabled={saving}
+              className="w-full py-3 rounded-md border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            >
+              下書きとして保存
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              disabled={saving}
+              className="btn-primary w-full py-3 text-base flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {saving && (
+                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              )}
+              {saving ? '保存中...' : '保存する'}
+            </button>
+          </div>
+
+          {!isNew && (
+            <div className="sm:hidden grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleDuplicate}
+                disabled={saving}
+                className="w-full py-2.5 rounded-md border border-slate-200 bg-white text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                複製
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                disabled={saving}
+                className="w-full py-2.5 rounded-md border border-red-200 bg-white text-red-600 text-sm hover:bg-red-50 disabled:opacity-50"
+              >
+                削除
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="商品を削除しますか？"
+        message={`「${form.name}」を削除します。\nこの操作は取り消せません。`}
+        confirmLabel="削除する"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </div>
   )
 }

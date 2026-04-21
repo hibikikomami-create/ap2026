@@ -1,12 +1,24 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
 import { BulkActionBar } from './BulkActionBar'
 import { calcProduct, fmt, fmtPct } from '../../lib/calculations'
 import { statusBadge } from '../../components/common/Badge'
-import type { FilterConfig, SortConfig, ProductStatus, SalesChannel } from '../../types'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { showToast } from '../../components/common/Toast'
+import { buildCsv, downloadCsv, makeCsvFilename, type CsvColumn } from '../../lib/exporters/csv'
+import type { FilterConfig, SortConfig, Product, ProductStatus, SalesChannel } from '../../types'
 
 const defaultFilter: FilterConfig = { status: 'all', channel: 'all', search: '' }
+const PAGE_SIZES = [10, 20, 50, 100] as const
+type PageSize = typeof PAGE_SIZES[number]
+
+const STATUS_LABEL: Record<ProductStatus, string> = {
+  active: '販売中',
+  inactive: '停止中',
+  draft: '下書き',
+  discontinued: '廃番',
+}
 
 export default function ProductsPage() {
   const navigate = useNavigate()
@@ -24,6 +36,10 @@ export default function ProductsPage() {
 
   const [filter, setFilter] = useState<FilterConfig>(defaultFilter)
   const [sort, setSort] = useState<SortConfig>({ key: 'createdAt', order: 'desc' })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<PageSize>(20)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const filteredProducts = useMemo(() => {
     let list = [...products]
@@ -64,23 +80,83 @@ export default function ProductsPage() {
     return list
   }, [products, filter, sort])
 
-  const allSelected = filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length
+  // Reset page when filters/pageSize change
+  useEffect(() => {
+    setPage(1)
+  }, [filter.search, filter.status, filter.channel, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * pageSize
+  const pageEnd = Math.min(pageStart + pageSize, filteredProducts.length)
+  const pageRows = filteredProducts.slice(pageStart, pageEnd)
+
+  const allSelected =
+    pageRows.length > 0 && pageRows.every((p) => selectedProductIds.includes(p.id))
 
   const handleToggleAll = () => {
     if (allSelected) clearSelection()
-    else selectAllProducts(filteredProducts.map((p) => p.id))
+    else selectAllProducts(pageRows.map((p) => p.id))
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('この商品を削除しますか？')) deleteProduct(id)
+  const handleRequestDelete = (product: Product) => setDeleteTarget(product)
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    deleteProduct(deleteTarget.id)
+    showToast('商品を削除しました', 'success')
+    setDeleteTarget(null)
   }
 
-  const handleBulkDelete = () => {
-    if (confirm(`${selectedProductIds.length}件の商品を削除しますか？`)) {
-      bulkDelete(selectedProductIds)
-      clearSelection()
+  const handleDuplicate = (id: string, name: string) => {
+    duplicateProduct(id)
+    showToast(`「${name}」を複製しました`, 'success')
+  }
+
+  const handleBulkStatus = (s: ProductStatus) => {
+    const n = selectedProductIds.length
+    bulkUpdateStatus(selectedProductIds, s)
+    showToast(`${n}件のステータスを「${STATUS_LABEL[s]}」に変更しました`, 'success')
+  }
+
+  const confirmBulkDelete = () => {
+    const n = selectedProductIds.length
+    bulkDelete(selectedProductIds)
+    clearSelection()
+    setBulkDeleteOpen(false)
+    showToast(`${n}件の商品を削除しました`, 'success')
+  }
+
+  const handleExportCsv = () => {
+    const source =
+      selectedProductIds.length > 0
+        ? filteredProducts.filter((p) => selectedProductIds.includes(p.id))
+        : filteredProducts
+    if (source.length === 0) {
+      showToast('エクスポート対象がありません', 'error')
+      return
     }
+    const columns: CsvColumn<Product>[] = [
+      { header: '商品名',       value: (p) => p.name },
+      { header: '品番',         value: (p) => p.code },
+      { header: 'カテゴリ',     value: (p) => p.category },
+      { header: 'ステータス',   value: (p) => STATUS_LABEL[p.status] ?? p.status },
+      { header: '上代',         value: (p) => p.sellingPrice },
+      { header: '卸価格',       value: (p) => p.wholesalePrice },
+      { header: '原価',         value: (p) => p.unitCost },
+      { header: '月間販売数',   value: (p) => p.expectedSalesVolume },
+      { header: '粗利率(%)',    value: (p) => calcProduct(p).grossMargin.toFixed(1) },
+      { header: '月間粗利',     value: (p) => calcProduct(p).grossProfit },
+      { header: 'チャネル',     value: (p) => p.salesChannels.join('|') },
+      { header: 'カラー',       value: (p) => p.colors.join('|') },
+      { header: 'サイズ',       value: (p) => p.sizes.join('|') },
+      { header: '登録日',       value: (p) => p.createdAt.slice(0, 10) },
+    ]
+    downloadCsv(makeCsvFilename('products'), buildCsv(source, columns))
+    showToast(`${source.length}件をCSV出力しました`, 'success')
   }
+
+  const hasActiveFilter = !!filter.search || filter.status !== 'all'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -91,16 +167,28 @@ export default function ProductsPage() {
             <h1 className="page-title">商品管理</h1>
             <p className="page-subtitle">{products.length}件登録中</p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/products/new')}
-            className="btn-primary flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            商品追加
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="btn-ghost flex items-center gap-1.5 border border-slate-200 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              CSV出力
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/products/new')}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              商品追加
+            </button>
+          </div>
         </div>
 
         {/* Filter bar */}
@@ -143,7 +231,7 @@ export default function ProductsPage() {
             <option value="grossMargin-desc">粗利率（高い順）</option>
           </select>
 
-          {filter.search || filter.status !== 'all' ? (
+          {hasActiveFilter && (
             <button
               type="button"
               onClick={() => setFilter(defaultFilter)}
@@ -151,7 +239,7 @@ export default function ProductsPage() {
             >
               クリア
             </button>
-          ) : null}
+          )}
 
           <div className="ml-auto text-sm text-slate-500">
             {filteredProducts.length !== products.length
@@ -169,14 +257,18 @@ export default function ProductsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" />
             </svg>
             <div className="text-slate-500 font-medium mb-1">
-              {filter.search || filter.status !== 'all' ? '該当する商品がありません' : '商品がまだ登録されていません'}
+              {hasActiveFilter ? '該当する商品がありません' : '商品がまだ登録されていません'}
             </div>
             <div className="text-sm text-slate-400 mb-5">
-              {filter.search || filter.status !== 'all'
+              {hasActiveFilter
                 ? '検索条件を変更してみてください'
                 : '商品を追加して収益管理を始めましょう'}
             </div>
-            {!(filter.search || filter.status !== 'all') && (
+            {hasActiveFilter ? (
+              <button type="button" onClick={() => setFilter(defaultFilter)} className="btn-ghost border border-slate-200 text-sm">
+                フィルターをクリア
+              </button>
+            ) : (
               <button type="button" onClick={() => navigate('/products/new')} className="btn-primary">
                 商品を追加する
               </button>
@@ -207,7 +299,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => {
+                  {pageRows.map((product) => {
                     const calc = calcProduct(product)
                     const sel = selectedProductIds.includes(product.id)
                     return (
@@ -256,7 +348,7 @@ export default function ProductsPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => duplicateProduct(product.id)}
+                              onClick={() => handleDuplicate(product.id, product.name)}
                               className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-colors"
                               title="複製"
                             >
@@ -266,7 +358,7 @@ export default function ProductsPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDelete(product.id)}
+                              onClick={() => handleRequestDelete(product)}
                               className="p-1.5 rounded text-red-400 hover:bg-red-50 transition-colors"
                               title="削除"
                             >
@@ -282,6 +374,66 @@ export default function ProductsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            <div className="px-4 py-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>表示件数</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value) as PageSize)}
+                  className="border border-slate-200 rounded-md px-2 py-1 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-400"
+                >
+                  {PAGE_SIZES.map((n) => (
+                    <option key={n} value={n}>{n}件</option>
+                  ))}
+                </select>
+                <span className="ml-2 tabular-nums">
+                  {filteredProducts.length === 0 ? '0' : `${pageStart + 1}-${pageEnd}`} / {filteredProducts.length}件
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage(1)}
+                  disabled={currentPage <= 1}
+                  className="px-2 py-1 rounded border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="先頭へ"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="px-2 py-1 rounded border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="前へ"
+                >
+                  ‹
+                </button>
+                <span className="px-2 tabular-nums">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="px-2 py-1 rounded border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="次へ"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="px-2 py-1 rounded border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="末尾へ"
+                >
+                  »
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -289,9 +441,29 @@ export default function ProductsPage() {
       <BulkActionBar
         count={selectedProductIds.length}
         onClearSelection={clearSelection}
-        onBulkStatus={(s) => bulkUpdateStatus(selectedProductIds, s)}
-        onBulkDelete={handleBulkDelete}
+        onBulkStatus={handleBulkStatus}
+        onBulkDelete={() => setBulkDeleteOpen(true)}
         onCreateDocument={() => navigate('/documents/new')}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="商品を削除しますか？"
+        message={deleteTarget ? `「${deleteTarget.name}」を削除します。\nこの操作は取り消せません。` : ''}
+        confirmLabel="削除する"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="選択した商品を削除しますか？"
+        message={`${selectedProductIds.length}件をまとめて削除します。\nこの操作は取り消せません。`}
+        confirmLabel="削除する"
+        danger
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
       />
     </div>
   )

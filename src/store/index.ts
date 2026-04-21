@@ -59,9 +59,14 @@ interface Actions {
   clearSelection: () => void
   // Documents
   addDocument: (doc: Omit<Document, 'id' | 'createdAt'>) => Document
+  updateDocument: (id: string, data: Partial<Document>) => void
   deleteDocument: (id: string) => void
+  duplicateDocument: (id: string) => void
+  bulkDeleteDocuments: (ids: string[]) => void
   // Settings
   updateSettings: (patch: Partial<UserSettings>) => void
+  // Danger
+  resetAllData: () => void
 }
 
 type Store = AppState & Actions
@@ -181,12 +186,48 @@ export const useStore = create<Store>()(
         set((s) => ({ documents: [...s.documents, document] }))
         return document
       },
+      updateDocument: (id, data) =>
+        set((s) => ({
+          documents: s.documents.map((d) =>
+            d.id === id ? { ...d, ...data } : d
+          ),
+        })),
       deleteDocument: (id) =>
         set((s) => ({ documents: s.documents.filter((d) => d.id !== id) })),
+      duplicateDocument: (id) => {
+        const src = get().documents.find((d) => d.id === id)
+        if (!src) return
+        const copy: Document = {
+          ...src,
+          id: nanoid(),
+          title: `${src.title} (コピー)`,
+          issueDate: new Date().toISOString().slice(0, 10),
+          createdAt: new Date().toISOString(),
+        }
+        set((s) => ({ documents: [...s.documents, copy] }))
+      },
+      bulkDeleteDocuments: (ids) =>
+        set((s) => ({
+          documents: s.documents.filter((d) => !ids.includes(d.id)),
+        })),
 
       // ── Settings ──────────────────────────────────────────────────────────
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
+
+      // ── Danger: 全データリセット ───────────────────────────────────────
+      resetAllData: () => {
+        set({
+          products: [],
+          documents: [],
+          projects: [],
+          currentProject: null,
+          selectedProductIds: [],
+          onboarding: defaultOnboarding,
+          onboardingStep: 0,
+          isSeeded: false,
+        })
+      },
     }),
     {
       name: STORAGE_KEY,

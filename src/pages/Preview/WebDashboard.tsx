@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { showToast } from '../../components/common/Toast'
+import { buildCsv, downloadCsv, makeCsvFilename, type CsvColumn } from '../../lib/exporters/csv'
 
 // ─── Dummy data types ────────────────────────────────────────────────────────
 
@@ -117,20 +119,28 @@ type SortKey = 'name' | 'amount' | 'updatedAt' | 'status'
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function WebDashboardPreview() {
+  const [items, setItems]     = useState<DemoItem[]>(ITEMS)
   const [search, setSearch]   = useState('')
   const [status, setStatus]   = useState<ItemStatus | 'all'>('all')
   const [category, setCategory] = useState('all')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [detailItem, setDetailItem] = useState<DemoItem | null>(null)
+  const [editItem, setEditItem] = useState<DemoItem | null>(null)
+  const [editDraft, setEditDraft] = useState<{ name: string; amount: number; status: ItemStatus } | null>(null)
+  const [newOpen, setNewOpen] = useState(false)
+  const [newDraft, setNewDraft] = useState({ name: '', category: 'アパレル', amount: 0, assignee: '' })
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false)
+  const [bulkStatusValue, setBulkStatusValue] = useState<ItemStatus>('active')
 
   const categories = useMemo(
-    () => ['all', ...Array.from(new Set(ITEMS.map((i) => i.category)))],
-    []
+    () => ['all', ...Array.from(new Set(items.map((i) => i.category)))],
+    [items]
   )
 
   const filtered = useMemo(() => {
-    let list = [...ITEMS]
+    let list = [...items]
     if (status !== 'all')   list = list.filter((i) => i.status === status)
     if (category !== 'all') list = list.filter((i) => i.category === category)
     if (search) {
@@ -140,8 +150,8 @@ export default function WebDashboardPreview() {
       )
     }
     list.sort((a, b) => {
-      let av: string | number = sortKey === 'amount' ? a.amount : a[sortKey]
-      let bv: string | number = sortKey === 'amount' ? b.amount : b[sortKey]
+      const av: string | number = sortKey === 'amount' ? a.amount : a[sortKey]
+      const bv: string | number = sortKey === 'amount' ? b.amount : b[sortKey]
       if (typeof av === 'number' && typeof bv === 'number')
         return sortDir === 'asc' ? av - bv : bv - av
       return sortDir === 'asc'
@@ -149,13 +159,13 @@ export default function WebDashboardPreview() {
         : String(bv).localeCompare(String(av), 'ja')
     })
     return list
-  }, [search, status, category, sortKey, sortDir])
+  }, [items, search, status, category, sortKey, sortDir])
 
-  // KPI
-  const activeItems   = ITEMS.filter((i) => i.status === 'active')
-  const pendingItems  = ITEMS.filter((i) => i.status === 'pending')
-  const reviewItems   = ITEMS.filter((i) => i.status === 'review')
-  const thisMonthRev  = ITEMS.filter((i) => i.createdAt.startsWith('2026-04') && i.status !== 'closed')
+  // KPI (live against state, not frozen data)
+  const activeItems   = items.filter((i) => i.status === 'active')
+  const pendingItems  = items.filter((i) => i.status === 'pending')
+  const reviewItems   = items.filter((i) => i.status === 'review')
+  const thisMonthRev  = items.filter((i) => i.createdAt.startsWith('2026-04') && i.status !== 'closed')
                              .reduce((s, i) => s + i.amount, 0)
 
   const allSelected = filtered.length > 0 && filtered.every((i) => selected.has(i.id))
@@ -171,6 +181,79 @@ export default function WebDashboardPreview() {
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const today = () => new Date().toISOString().slice(0, 10)
+
+  const handleCsvExport = () => {
+    const source = selected.size > 0 ? filtered.filter((i) => selected.has(i.id)) : filtered
+    if (source.length === 0) {
+      showToast('エクスポート対象がありません', 'error')
+      return
+    }
+    const columns: CsvColumn<DemoItem>[] = [
+      { header: 'ID',          value: (i) => i.id },
+      { header: '案件名',      value: (i) => i.name },
+      { header: '分類',        value: (i) => i.category },
+      { header: 'ステータス',  value: (i) => STATUS_LABEL[i.status] },
+      { header: '担当者',      value: (i) => i.assignee },
+      { header: '金額',        value: (i) => i.amount },
+      { header: '更新日',      value: (i) => i.updatedAt },
+      { header: '作成日',      value: (i) => i.createdAt },
+    ]
+    downloadCsv(makeCsvFilename('dashboard'), buildCsv(source, columns))
+    showToast(`${source.length}件をCSV出力しました`, 'success')
+  }
+
+  const handleCreate = () => {
+    if (!newDraft.name.trim()) {
+      showToast('案件名を入力してください', 'error')
+      return
+    }
+    const id = String(items.length + 1).padStart(2, '0')
+    const next: DemoItem = {
+      id,
+      name: newDraft.name.trim(),
+      category: newDraft.category,
+      status: 'pending',
+      amount: newDraft.amount || 0,
+      updatedAt: today(),
+      createdAt: today(),
+      assignee: newDraft.assignee.trim() || '（未設定）',
+    }
+    setItems((prev) => [next, ...prev])
+    setNewOpen(false)
+    setNewDraft({ name: '', category: 'アパレル', amount: 0, assignee: '' })
+    showToast(`「${next.name}」を追加しました`, 'success')
+  }
+
+  const handleEdit = () => {
+    if (!editItem || !editDraft) return
+    if (!editDraft.name.trim()) {
+      showToast('案件名を入力してください', 'error')
+      return
+    }
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === editItem.id
+          ? { ...i, name: editDraft.name.trim(), amount: editDraft.amount, status: editDraft.status, updatedAt: today() }
+          : i
+      )
+    )
+    setEditItem(null)
+    setEditDraft(null)
+    showToast('変更を保存しました', 'success')
+  }
+
+  const handleBulkStatus = () => {
+    const ids = Array.from(selected)
+    setItems((prev) =>
+      prev.map((i) => (ids.includes(i.id) ? { ...i, status: bulkStatusValue, updatedAt: today() } : i))
+    )
+    setSelected(new Set())
+    setBulkStatusOpen(false)
+    showToast(`${ids.length}件のステータスを「${STATUS_LABEL[bulkStatusValue]}」に変更しました`, 'success')
   }
 
   const SortIcon = ({ k }: { k: SortKey }) => {
@@ -201,7 +284,7 @@ export default function WebDashboardPreview() {
             <button
               type="button"
               className="btn-ghost flex items-center gap-1.5 border border-slate-200"
-              onClick={() => alert('CSV出力（実装予定）')}
+              onClick={handleCsvExport}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -211,7 +294,7 @@ export default function WebDashboardPreview() {
             <button
               type="button"
               className="btn-primary flex items-center gap-1.5"
-              onClick={() => alert('新規作成（実装予定）')}
+              onClick={() => setNewOpen(true)}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -335,9 +418,9 @@ export default function WebDashboardPreview() {
               </button>
             )}
             <div className="ml-auto text-xs text-slate-400 whitespace-nowrap">
-              {filtered.length !== ITEMS.length
-                ? `${filtered.length} / ${ITEMS.length}件`
-                : `${ITEMS.length}件`}
+              {filtered.length !== items.length
+                ? `${filtered.length} / ${items.length}件`
+                : `${items.length}件`}
             </div>
           </div>
         </div>
@@ -351,8 +434,27 @@ export default function WebDashboardPreview() {
               {selected.size > 0 && (
                 <div className="bg-brand-50 border-b border-brand-100 px-4 py-2.5 flex items-center gap-3">
                   <span className="text-sm font-medium text-brand-700">{selected.size}件を選択中</span>
-                  <button type="button" className="text-xs text-brand-600 hover:underline" onClick={() => alert('ステータス変更（実装予定）')}>ステータス変更</button>
-                  <button type="button" className="text-xs text-red-500 hover:underline" onClick={() => setSelected(new Set())}>選択解除</button>
+                  <button
+                    type="button"
+                    className="text-xs text-brand-600 hover:underline"
+                    onClick={() => setBulkStatusOpen(true)}
+                  >
+                    ステータス変更
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-brand-600 hover:underline"
+                    onClick={handleCsvExport}
+                  >
+                    CSV出力
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-red-500 hover:underline ml-auto"
+                    onClick={() => setSelected(new Set())}
+                  >
+                    選択解除
+                  </button>
                 </div>
               )}
 
@@ -435,7 +537,7 @@ export default function WebDashboardPreview() {
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => alert(`「${item.name}」の詳細（実装予定）`)}
+                                  onClick={() => setDetailItem(item)}
                                   className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                                   title="詳細"
                                 >
@@ -446,7 +548,10 @@ export default function WebDashboardPreview() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => alert(`「${item.name}」の編集（実装予定）`)}
+                                  onClick={() => {
+                                    setEditItem(item)
+                                    setEditDraft({ name: item.name, amount: item.amount, status: item.status })
+                                  }}
                                   className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-colors"
                                   title="編集"
                                 >
@@ -495,8 +600,8 @@ export default function WebDashboardPreview() {
                     ['closed',  '完了',      'bg-slate-300'],
                   ] as [ItemStatus, string, string][]
                 ).map(([s, label, barColor]) => {
-                  const count = ITEMS.filter((i) => i.status === s).length
-                  const pct = Math.round((count / ITEMS.length) * 100)
+                  const count = items.filter((i) => i.status === s).length
+                  const pct = items.length > 0 ? Math.round((count / items.length) * 100) : 0
                   return (
                     <div key={s}>
                       <div className="flex items-center justify-between mb-1">
@@ -547,6 +652,236 @@ export default function WebDashboardPreview() {
           </div>
         </div>
 
+      </div>
+
+      {/* ── Detail modal ─────────────────────────────────────────────────── */}
+      {detailItem && (
+        <PreviewModal title="案件の詳細" onClose={() => setDetailItem(null)}>
+          <dl className="grid grid-cols-3 gap-x-3 gap-y-3 text-sm">
+            <dt className="col-span-1 text-slate-500">案件名</dt>
+            <dd className="col-span-2 font-medium text-slate-900">{detailItem.name}</dd>
+            <dt className="col-span-1 text-slate-500">分類</dt>
+            <dd className="col-span-2">{detailItem.category}</dd>
+            <dt className="col-span-1 text-slate-500">ステータス</dt>
+            <dd className="col-span-2">
+              <span className={`badge ${STATUS_CLASS[detailItem.status]}`}>
+                {STATUS_LABEL[detailItem.status]}
+              </span>
+            </dd>
+            <dt className="col-span-1 text-slate-500">担当者</dt>
+            <dd className="col-span-2">{detailItem.assignee}</dd>
+            <dt className="col-span-1 text-slate-500">金額</dt>
+            <dd className="col-span-2 tabular-nums font-medium">{fmt(detailItem.amount)}</dd>
+            <dt className="col-span-1 text-slate-500">作成日</dt>
+            <dd className="col-span-2 tabular-nums text-slate-600">{detailItem.createdAt}</dd>
+            <dt className="col-span-1 text-slate-500">更新日</dt>
+            <dd className="col-span-2 tabular-nums text-slate-600">{detailItem.updatedAt}</dd>
+          </dl>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDetailItem(null)}
+              className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md"
+            >
+              閉じる
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditItem(detailItem)
+                setEditDraft({ name: detailItem.name, amount: detailItem.amount, status: detailItem.status })
+                setDetailItem(null)
+              }}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              編集する
+            </button>
+          </div>
+        </PreviewModal>
+      )}
+
+      {/* ── Edit modal ───────────────────────────────────────────────────── */}
+      {editItem && editDraft && (
+        <PreviewModal title="案件を編集" onClose={() => { setEditItem(null); setEditDraft(null) }}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">案件名</label>
+              <input
+                type="text"
+                value={editDraft.name}
+                onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">金額</label>
+                <input
+                  type="number"
+                  value={editDraft.amount}
+                  onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">ステータス</label>
+                <select
+                  value={editDraft.status}
+                  onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value as ItemStatus })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+                >
+                  <option value="active">進行中</option>
+                  <option value="pending">未対応</option>
+                  <option value="review">レビュー中</option>
+                  <option value="closed">完了</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => { setEditItem(null); setEditDraft(null) }}
+              className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              保存
+            </button>
+          </div>
+        </PreviewModal>
+      )}
+
+      {/* ── New item modal ───────────────────────────────────────────────── */}
+      {newOpen && (
+        <PreviewModal title="案件を新規作成" onClose={() => setNewOpen(false)}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">案件名 <span className="text-brand-500">*</span></label>
+              <input
+                type="text"
+                value={newDraft.name}
+                onChange={(e) => setNewDraft({ ...newDraft, name: e.target.value })}
+                placeholder="例：夏季限定コラボ企画"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">分類</label>
+                <select
+                  value={newDraft.category}
+                  onChange={(e) => setNewDraft({ ...newDraft, category: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+                >
+                  {categories.filter((c) => c !== 'all').map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">金額</label>
+                <input
+                  type="number"
+                  value={newDraft.amount}
+                  onChange={(e) => setNewDraft({ ...newDraft, amount: Number(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">担当者</label>
+              <input
+                type="text"
+                value={newDraft.assignee}
+                onChange={(e) => setNewDraft({ ...newDraft, assignee: e.target.value })}
+                placeholder="例：山田 花子"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNewOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              作成
+            </button>
+          </div>
+        </PreviewModal>
+      )}
+
+      {/* ── Bulk status modal ────────────────────────────────────────────── */}
+      {bulkStatusOpen && (
+        <PreviewModal title="選択項目のステータスを変更" onClose={() => setBulkStatusOpen(false)}>
+          <p className="text-sm text-slate-600 mb-3">
+            {selected.size}件のステータスをまとめて変更します。
+          </p>
+          <select
+            value={bulkStatusValue}
+            onChange={(e) => setBulkStatusValue(e.target.value as ItemStatus)}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+          >
+            <option value="active">進行中</option>
+            <option value="pending">未対応</option>
+            <option value="review">レビュー中</option>
+            <option value="closed">完了</option>
+          </select>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkStatusOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkStatus}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              変更する
+            </button>
+          </div>
+        </PreviewModal>
+      )}
+    </div>
+  )
+}
+
+// Small inline modal used only for the Preview page to avoid touching the global Modal.
+function PreviewModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-lg shadow-xl border border-slate-200">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded text-slate-400 hover:bg-slate-50"
+            aria-label="閉じる"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
       </div>
     </div>
   )

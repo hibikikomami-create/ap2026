@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
+import { showToast } from '../../components/common/Toast'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import type { UserSettings } from '../../types'
 
 type Tab = 'user' | 'company' | 'output'
@@ -11,17 +13,41 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function Settings() {
-  const { settings, updateSettings } = useStore()
+  const { settings, updateSettings, resetAllData } = useStore()
   const [tab, setTab] = useState<Tab>('user')
-  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<UserSettings>(settings)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const upd = (patch: Partial<UserSettings>) => setForm((f) => ({ ...f, ...patch }))
 
-  const handleSave = () => {
-    updateSettings(form)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  const handleSave = async () => {
+    if (!form.displayName.trim()) {
+      showToast('表示名を入力してください', 'error')
+      setTab('user')
+      return
+    }
+    setSaving(true)
+    try {
+      updateSettings(form)
+      await new Promise((r) => setTimeout(r, 200))
+      showToast('設定を保存しました', 'success')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = async () => {
+    setResetting(true)
+    try {
+      resetAllData()
+      await new Promise((r) => setTimeout(r, 200))
+      showToast('すべてのデータを削除しました', 'success')
+    } finally {
+      setResetting(false)
+      setResetOpen(false)
+    }
   }
 
   return (
@@ -35,9 +61,13 @@ export default function Settings() {
           <button
             type="button"
             onClick={handleSave}
-            className="btn-primary"
+            disabled={saving}
+            className="btn-primary flex items-center gap-2 disabled:opacity-60"
           >
-            {saved ? '保存しました' : '変更を保存'}
+            {saving && (
+              <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            )}
+            {saving ? '保存中...' : '変更を保存'}
           </button>
         </div>
       </div>
@@ -188,13 +218,38 @@ export default function Settings() {
             <div className="mt-6 card p-5 border-red-100">
               <h2 className="text-sm font-semibold text-slate-500 mb-3">危険な操作</h2>
               <div className="space-y-2">
-                <DangerRow label="全データをリセット" />
-                <DangerRow label="アカウントを削除" />
+                <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                  <div>
+                    <div className="text-sm text-slate-700">全データをリセット</div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      登録された商品・発注書・プロジェクトをすべて削除します
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResetOpen(true)}
+                    className="px-3 py-1.5 rounded-md border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition-colors"
+                  >
+                    実行
+                  </button>
+                </div>
+                <DangerRow label="アカウントを削除" note="本実装時に対応予定" />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={resetOpen}
+        title="全データをリセットしますか？"
+        message={'登録済みの商品・発注書・プロジェクトをすべて削除します。\nこの操作は取り消せません。'}
+        confirmLabel="リセットする"
+        danger
+        busy={resetting}
+        onConfirm={handleReset}
+        onCancel={() => setResetOpen(false)}
+      />
     </div>
   )
 }
@@ -252,10 +307,13 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   )
 }
 
-function DangerRow({ label }: { label: string }) {
+function DangerRow({ label, note }: { label: string; note?: string }) {
   return (
     <div className="flex items-center justify-between py-2.5 opacity-50">
-      <span className="text-sm text-slate-700">{label}</span>
+      <div>
+        <span className="text-sm text-slate-700">{label}</span>
+        {note && <div className="text-xs text-slate-400 mt-0.5">{note}</div>}
+      </div>
       <button
         type="button"
         disabled
