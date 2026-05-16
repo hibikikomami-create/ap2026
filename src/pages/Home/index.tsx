@@ -33,7 +33,7 @@ export default function Home() {
         <div className="page-header-inner">
           <div>
             <h1 className="page-title">ダッシュボード</h1>
-            <p className="page-subtitle">{displayName} さん、{greeting()} 。</p>
+            <p className="page-subtitle">{displayName} さん、{greeting()}。</p>
           </div>
           <button
             type="button"
@@ -43,14 +43,15 @@ export default function Home() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            商品追加
+            <span className="hidden sm:inline">商品追加</span>
+            <span className="sm:hidden">追加</span>
           </button>
         </div>
       </div>
 
-      <div className="page-content space-y-6">
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="page-content space-y-4 md:space-y-6">
+        {/* KPI cards — 2 cols on mobile, 4 on lg */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <KpiCard
             label="登録商品"
             value={`${products.length}`}
@@ -95,8 +96,35 @@ export default function Home() {
           />
         </div>
 
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick actions — prominent on mobile */}
+        <div className="card p-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">クイックアクション</h2>
+          <div className="grid grid-cols-3 gap-2 md:hidden">
+            <QuickTile
+              label="商品追加"
+              icon="📦"
+              onClick={() => navigate('/products/new')}
+            />
+            <QuickTile
+              label="発注書作成"
+              icon="📋"
+              onClick={() => navigate('/documents/new')}
+            />
+            <QuickTile
+              label="収益試算"
+              icon="📊"
+              onClick={() => navigate('/onboarding/1')}
+            />
+          </div>
+          <div className="hidden md:block space-y-1.5">
+            <QuickLink label="商品を追加" desc="新規商品の登録" onClick={() => navigate('/products/new')} />
+            <QuickLink label="発注書を作成" desc="商品を選んで帳票生成" onClick={() => navigate('/documents/new')} />
+            <QuickLink label="収益を試算" desc="シミュレーション開始" onClick={() => navigate('/onboarding/1')} />
+          </div>
+        </div>
+
+        {/* Two-column layout on lg */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Recent products */}
           <div className="lg:col-span-2">
             <div className="card overflow-hidden">
@@ -123,68 +151,74 @@ export default function Home() {
                   </button>
                 </div>
               ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>商品名</th>
-                      <th className="hidden sm:table-cell">品番</th>
-                      <th>上代</th>
-                      <th>粗利率</th>
-                      <th>ステータス</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <>
+                  {/* Mobile: card list */}
+                  <div className="md:hidden divide-y divide-slate-100">
                     {recentProducts.map((product) => {
                       const calc = calcProduct(product)
                       return (
-                        <tr
+                        <div
                           key={product.id}
-                          className="cursor-pointer"
+                          className="mobile-card-item"
                           onClick={() => navigate(`/products/${product.id}`)}
                         >
-                          <td className="font-medium text-slate-900">{product.name}</td>
-                          <td className="hidden sm:table-cell text-slate-500 font-mono text-xs">{product.code}</td>
-                          <td className="tabular-nums">{fmt(product.sellingPrice)}</td>
-                          <td className={`tabular-nums font-medium
-                            ${calc.grossMargin >= 30 ? 'text-green-600' : calc.grossMargin >= 15 ? 'text-amber-600' : 'text-red-500'}`}
-                          >
-                            {fmtPct(calc.grossMargin)}
-                          </td>
-                          <td>{statusBadge(product.status)}</td>
-                        </tr>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-slate-900 text-sm truncate mb-1">{product.name}</div>
+                            <div className="text-xs text-slate-500 tabular-nums">{fmt(product.sellingPrice)}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-sm font-semibold tabular-nums ${
+                              calc.grossMargin >= 30 ? 'text-green-600' : calc.grossMargin >= 15 ? 'text-amber-600' : 'text-red-500'
+                            }`}>
+                              {fmtPct(calc.grossMargin)}
+                            </span>
+                            {statusBadge(product.status)}
+                          </div>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                  {/* Desktop: table */}
+                  <table className="data-table hidden md:table">
+                    <thead>
+                      <tr>
+                        <th>商品名</th>
+                        <th className="hidden sm:table-cell">品番</th>
+                        <th>上代</th>
+                        <th>粗利率</th>
+                        <th>ステータス</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentProducts.map((product) => {
+                        const calc = calcProduct(product)
+                        return (
+                          <tr
+                            key={product.id}
+                            className="cursor-pointer"
+                            onClick={() => navigate(`/products/${product.id}`)}
+                          >
+                            <td className="font-medium text-slate-900">{product.name}</td>
+                            <td className="hidden sm:table-cell text-slate-500 font-mono text-xs">{product.code}</td>
+                            <td className="tabular-nums">{fmt(product.sellingPrice)}</td>
+                            <td className={`tabular-nums font-medium
+                              ${calc.grossMargin >= 30 ? 'text-green-600' : calc.grossMargin >= 15 ? 'text-amber-600' : 'text-red-500'}`}
+                            >
+                              {fmtPct(calc.grossMargin)}
+                            </td>
+                            <td>{statusBadge(product.status)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
           </div>
 
-          {/* Right column */}
-          <div className="space-y-4">
-            {/* Quick actions */}
-            <div className="card p-4">
-              <h2 className="text-sm font-semibold text-slate-800 mb-3">クイックアクション</h2>
-              <div className="space-y-1.5">
-                <QuickLink
-                  label="商品を追加"
-                  desc="新規商品の登録"
-                  onClick={() => navigate('/products/new')}
-                />
-                <QuickLink
-                  label="発注書を作成"
-                  desc="商品を選んで帳票生成"
-                  onClick={() => navigate('/documents/new')}
-                />
-                <QuickLink
-                  label="収益を試算"
-                  desc="シミュレーション開始"
-                  onClick={() => navigate('/onboarding/1')}
-                />
-              </div>
-            </div>
-
-            {/* Recent documents */}
+          {/* Recent documents */}
+          <div>
             <div className="card overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-800">最近の発注書</h2>
@@ -201,7 +235,11 @@ export default function Home() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {recentDocs.map((doc) => (
-                    <div key={doc.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
+                    <div
+                      key={doc.id}
+                      className="px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/documents/${doc.id}`)}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-slate-900 truncate">{doc.title}</div>
@@ -241,16 +279,29 @@ function KpiCard({
   return (
     <div className="card px-4 py-4">
       <div className="flex items-start justify-between">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        <div className={`p-1.5 rounded-md ${highlight ? 'bg-brand-50 text-brand-600' : warn ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-400'}`}>
+        <div className="text-xs font-medium text-slate-500 leading-tight">{label}</div>
+        <div className={`p-1.5 rounded-lg ${highlight ? 'bg-brand-50 text-brand-600' : warn ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-400'}`}>
           {icon}
         </div>
       </div>
-      <div className={`text-2xl font-semibold mt-2 tabular-nums ${warn ? 'text-red-600' : 'text-slate-900'}`}>
+      <div className={`text-xl md:text-2xl font-semibold mt-2 tabular-nums ${warn ? 'text-red-600' : 'text-slate-900'}`}>
         {value}
       </div>
       <div className="text-xs text-slate-400 mt-1">{sub}</div>
     </div>
+  )
+}
+
+function QuickTile({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-slate-50 hover:bg-brand-50 active:bg-brand-100 transition-colors text-center"
+    >
+      <span className="text-2xl">{icon}</span>
+      <span className="text-xs font-medium text-slate-700">{label}</span>
+    </button>
   )
 }
 
@@ -259,7 +310,7 @@ function QuickLink({ label, desc, onClick }: { label: string; desc: string; onCl
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center justify-between px-3 py-2.5 rounded-md hover:bg-slate-50 transition-colors text-left group"
+      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors text-left group"
     >
       <div>
         <div className="text-sm font-medium text-slate-800 group-hover:text-brand-700">{label}</div>

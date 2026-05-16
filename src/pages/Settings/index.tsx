@@ -77,18 +77,18 @@ export default function Settings() {
 
       <div className="page-content max-w-4xl">
         <div className="flex gap-6 flex-col md:flex-row">
-          {/* Sidebar tabs */}
-          <div className="md:w-48 shrink-0">
-            <nav className="space-y-0.5">
+          {/* Tabs — horizontal scroll on mobile, vertical sidebar on desktop */}
+          <div className="md:w-48 md:shrink-0">
+            <nav className="flex md:flex-col gap-1 md:gap-0.5 overflow-x-auto md:overflow-visible scrollbar-none -mx-4 md:mx-0 px-4 md:px-0 pb-1 md:pb-0">
               {TABS.map((t) => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setTab(t.key)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors
+                  className={`flex-shrink-0 md:w-full text-left px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap
                     ${tab === t.key
-                      ? 'bg-brand-50 text-brand-700 font-medium'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-slate-600 hover:bg-slate-100 active:bg-slate-200'
                     }`}
                 >
                   {t.label}
