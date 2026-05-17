@@ -1,0 +1,3 @@
+function e(e){if(e==null)return``;let t=String(e);return t.includes(`,`)||t.includes(`"`)||t.includes(`
+`)||t.includes(`\r`)?`"${t.replace(/"/g,`""`)}"`:t}function t(t,n){return[n.map(t=>e(t.header)).join(`,`),...t.map(t=>n.map(n=>e(n.value(t))).join(`,`))].join(`\r
+`)}function n(e,t){let n=new Blob([`﻿`+t],{type:`text/csv;charset=utf-8`}),r=URL.createObjectURL(n),i=document.createElement(`a`);i.href=r,i.download=e,document.body.appendChild(i),i.click(),document.body.removeChild(i),setTimeout(()=>URL.revokeObjectURL(r),1e3)}function r(e){let t=new Date,n=e=>String(e).padStart(2,`0`);return`${e}_${t.getFullYear()}${n(t.getMonth()+1)}${n(t.getDate())}_${n(t.getHours())}${n(t.getMinutes())}.csv`}export{n,r,t};
