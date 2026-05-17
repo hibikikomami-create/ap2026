@@ -16,6 +16,8 @@ import type {
   Document,
   ProductStatus,
   UserSettings,
+  DailyReport,
+  ChatMessage,
 } from '../types'
 
 const defaultOnboarding: OnboardingData = {
@@ -65,6 +67,14 @@ interface Actions {
   bulkDeleteDocuments: (ids: string[]) => void
   // Settings
   updateSettings: (patch: Partial<UserSettings>) => void
+  // Daily reports
+  addDailyReport: (report: Omit<DailyReport, 'id' | 'createdAt' | 'updatedAt'>) => DailyReport
+  updateDailyReport: (id: string, data: Partial<DailyReport>) => void
+  deleteDailyReport: (id: string) => void
+  upsertDailyReport: (date: string, data: Partial<Omit<DailyReport, 'id' | 'createdAt' | 'updatedAt'>>) => void
+  // Chat
+  setChatHistory: (messages: ChatMessage[]) => void
+  clearChatHistory: () => void
   // Danger
   resetAllData: () => void
 }
@@ -77,6 +87,8 @@ export const useStore = create<Store>()(
       // ── State ─────────────────────────────────────────────────────────────
       currentProject: SAMPLE_PROJECTS[0],
       onboarding: defaultOnboarding,
+      dailyReports: [],
+      chatHistory: [],
       products: SAMPLE_PRODUCTS,
       projects: SAMPLE_PROJECTS,
       documents: SAMPLE_DOCUMENTS,
@@ -215,6 +227,44 @@ export const useStore = create<Store>()(
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
 
+      // ── Daily Reports ─────────────────────────────────────────────────────
+      addDailyReport: (data) => {
+        const now = new Date().toISOString()
+        const report: DailyReport = { id: nanoid(), createdAt: now, updatedAt: now, ...data }
+        set((s) => ({ dailyReports: [...s.dailyReports, report] }))
+        return report
+      },
+      updateDailyReport: (id, data) =>
+        set((s) => ({
+          dailyReports: s.dailyReports.map((r) =>
+            r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+          ),
+        })),
+      deleteDailyReport: (id) =>
+        set((s) => ({ dailyReports: s.dailyReports.filter((r) => r.id !== id) })),
+      upsertDailyReport: (date, data) => {
+        const existing = get().dailyReports.find((r) => r.date === date)
+        if (existing) {
+          set((s) => ({
+            dailyReports: s.dailyReports.map((r) =>
+              r.id === existing.id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+            ),
+          }))
+        } else {
+          const now = new Date().toISOString()
+          const report: DailyReport = {
+            id: nanoid(), date, createdAt: now, updatedAt: now,
+            salesAmount: 0, orderCount: 0, mood: 'good', memo: '', tasks: [],
+            ...data,
+          }
+          set((s) => ({ dailyReports: [...s.dailyReports, report] }))
+        }
+      },
+
+      // ── Chat ──────────────────────────────────────────────────────────────
+      setChatHistory: (messages) => set({ chatHistory: messages.slice(-40) }),
+      clearChatHistory: () => set({ chatHistory: [] }),
+
       // ── Danger: 全データリセット ───────────────────────────────────────
       resetAllData: () => {
         set({
@@ -226,6 +276,8 @@ export const useStore = create<Store>()(
           onboarding: defaultOnboarding,
           onboardingStep: 0,
           isSeeded: false,
+          dailyReports: [],
+          chatHistory: [],
         })
       },
     }),
@@ -247,13 +299,13 @@ export const useStore = create<Store>()(
       // 永続化する項目のみを限定（UI状態は除外して容量を節約）
       partialize: (s) => ({
         currentProject: s.currentProject,
-        // 件数が多い場合は古いものからトリミング
         products: trimProducts(s.products),
         projects: s.projects,
         documents: trimDocuments(s.documents),
         settings: s.settings,
         isSeeded: s.isSeeded,
-        // selectedProductIds / onboarding / onboardingStep は永続化しない
+        dailyReports: s.dailyReports.slice(-365),
+        chatHistory: s.chatHistory.slice(-40),
       }),
     }
   )

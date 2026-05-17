@@ -18,6 +18,8 @@ import ProductDetail from './pages/ProductDetail'
 import DocumentsList from './pages/Documents/List'
 import DocumentsNew from './pages/Documents'
 import Settings from './pages/Settings'
+import ChatPage from './pages/Chat'
+import CalendarPage from './pages/Calendar'
 import LoginPage from './pages/Login'
 import SignupPage from './pages/Signup'
 import WebDashboardPreview from './pages/Preview/WebDashboard'
@@ -68,6 +70,12 @@ export default function App() {
           <Route path="/documents" element={<AuthGuard><DocumentsList /></AuthGuard>} />
           <Route path="/documents/new" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
           <Route path="/documents/:id" element={<AuthGuard><DocumentsNew /></AuthGuard>} />
+
+          {/* Chat */}
+          <Route path="/chat" element={<AuthGuard><ChatPage /></AuthGuard>} />
+
+          {/* Calendar */}
+          <Route path="/calendar" element={<AuthGuard><CalendarPage /></AuthGuard>} />
 
           {/* Settings */}
           <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />

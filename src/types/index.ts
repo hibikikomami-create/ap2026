@@ -183,6 +183,43 @@ export interface UserSettings {
   outputIncludeLogo: boolean
   outputIncludeTax: boolean
   outputFormat: 'a4' | 'letter'
+  // AI
+  apiKey: string
+  aiModel: string
+  // Features
+  featureChat: boolean
+  featureCalendar: boolean
+  // Team
+  teamName: string
+}
+
+// ─── Daily Report ─────────────────────────────────────────────────────────────
+
+export interface DailyTask {
+  id: string
+  text: string
+  done: boolean
+}
+
+export interface DailyReport {
+  id: string
+  date: string // YYYY-MM-DD
+  salesAmount: number
+  orderCount: number
+  mood: 'great' | 'good' | 'okay' | 'bad'
+  memo: string
+  tasks: DailyTask[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
 }
 
 // ─── Store State ─────────────────────────────────────────────────────────────
@@ -197,6 +234,8 @@ export interface AppState {
   onboardingStep: number
   settings: UserSettings
   isSeeded: boolean
+  dailyReports: DailyReport[]
+  chatHistory: ChatMessage[]
 }
 
 // ─── Column visibility ────────────────────────────────────────────────────────

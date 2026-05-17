@@ -13,6 +13,11 @@ export const SAMPLE_SETTINGS: UserSettings = {
   outputIncludeLogo: true,
   outputIncludeTax: true,
   outputFormat: 'a4',
+  apiKey: '',
+  aiModel: 'claude-haiku-4-5-20251001',
+  featureChat: true,
+  featureCalendar: true,
+  teamName: '',
 }
 
 export const SAMPLE_PROJECTS: Project[] = [
