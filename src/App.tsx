@@ -4,8 +4,10 @@ import { AppShell } from './components/layout/AppShell'
 import { AuthGuard } from './components/AuthGuard'
 import { ToastContainer } from './components/common/Toast'
 import { useAuthStore } from './store/authStore'
-import Welcome from './pages/Welcome'
 import Home from './pages/Home'
+import MagazineHome from './pages/Magazine'
+import MagazinePost from './pages/Magazine/Post'
+import MagazineAbout from './pages/Magazine/About'
 import Step1BusinessType from './pages/Onboarding/Step1BusinessType'
 import Step2SalesChannel from './pages/Onboarding/Step2SalesChannel'
 import Step3UserRole from './pages/Onboarding/Step3UserRole'
@@ -42,8 +44,13 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
 
+          {/* Magazine — public website */}
+          <Route path="/mag" element={<MagazineHome />} />
+          <Route path="/mag/about" element={<MagazineAbout />} />
+          <Route path="/mag/:id" element={<MagazinePost />} />
+
           {/* Landing */}
-          <Route path="/" element={<Welcome />} />
+          <Route path="/" element={<MagazineHome />} />
 
           {/* Onboarding wizard (full-screen) */}
           <Route path="/onboarding/1" element={<Step1BusinessType />} />
@@ -79,7 +86,7 @@ export default function App() {
           <Route path="/dashboard" element={<Navigate to="/products" replace />} />
 
           {/* Fallback */}
-          <Route path="*" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/mag" replace />} />
         </Routes>
       </AppShell>
     </HashRouter>

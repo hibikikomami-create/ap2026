@@ -4,6 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Existing app colors
         brand: {
           50:  '#eef2ff',
           100: '#e0e7ff',
@@ -29,9 +30,36 @@ export default {
           800: '#075985',
           900: '#0c4a6e',
         },
+        // Magazine theme
+        mag: {
+          bg:      '#0a0a0a',
+          surface: '#131313',
+          border:  '#1e1e1e',
+          muted:   '#3d3d3d',
+          dim:     '#6b6560',
+          text:    '#e8e3dc',
+          gold:    '#c9a84c',
+          'gold-dim': '#8a7133',
+          'warm-white': '#f2ede6',
+        },
       },
       fontFamily: {
-        sans: ['"Noto Sans JP"', 'Hiragino Kaku Gothic ProN', 'sans-serif'],
+        sans:  ['"Noto Sans JP"', 'Hiragino Kaku Gothic ProN', 'sans-serif'],
+        inter: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        mono:  ['"Space Mono"', 'monospace'],
+      },
+      letterSpacing: {
+        'widest-2': '0.3em',
+        'widest-3': '0.5em',
+      },
+      animation: {
+        'fade-in':    'fadeIn 0.6s ease forwards',
+        'slide-up':   'slideUp 0.5s ease forwards',
+      },
+      keyframes: {
+        fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
+        slideUp: { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
       },
     },
   },

@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { SideNav } from './SideNav'
 import { BottomNav } from './BottomNav'
 
-const FULL_SCREEN_PATHS = ['/', '/login', '/signup', '/onboarding', '/sheet-result']
+const FULL_SCREEN_PATHS = ['/', '/login', '/signup', '/onboarding', '/sheet-result', '/mag']
 
 interface Props {
   children: ReactNode
@@ -17,7 +17,8 @@ export function AppShell({ children }: Props) {
   const isFullScreen = FULL_SCREEN_PATHS.some(
     (p) =>
       location.pathname === p ||
-      location.pathname.startsWith('/onboarding')
+      location.pathname.startsWith('/onboarding') ||
+      location.pathname.startsWith('/mag')
   )
 
   if (isFullScreen) {
